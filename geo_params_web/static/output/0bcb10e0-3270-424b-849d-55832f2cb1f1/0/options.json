@@ -1,0 +1,46 @@
+{
+  "user": {
+    "email": null,
+    "name": null,
+    "anonymize": true,
+    "experience": 4
+  },
+  "image_select.filename": "72.53_jpeg_escal.jpg",
+  "initial_image_setup.min_pore_size": 100,
+  "params_select.clicked_points": [
+    {
+      "x": 22,
+      "y": 18
+    },
+    {
+      "x": 25,
+      "y": 19
+    },
+    {
+      "x": 24,
+      "y": 20
+    },
+    {
+      "x": 26,
+      "y": 21
+    },
+    {
+      "x": 29,
+      "y": 19
+    },
+    {
+      "x": 27,
+      "y": 22
+    },
+    {
+      "x": 29,
+      "y": 18
+    }
+  ],
+  "params_select.priority": "shape",
+  "initial_image_setup.tile_shape": [
+    167,
+    223
+  ],
+  "params_select.state": "Done"
+}

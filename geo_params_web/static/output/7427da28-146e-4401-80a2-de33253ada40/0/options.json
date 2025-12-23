@@ -1,0 +1,38 @@
+{
+  "user": {
+    "email": null,
+    "name": null,
+    "anonimize": false,
+    "experience": 2,
+    "anonymize": true
+  },
+  "image_select.filename": "72.53_jpeg_escal.jpg",
+  "initial_image_setup.min_pore_size": 480,
+  "region_select.clicked_points": [
+    {
+      "x": 15,
+      "y": 19
+    },
+    {
+      "x": 29,
+      "y": 9
+    },
+    {
+      "x": 20,
+      "y": 0
+    },
+    {
+      "x": 23,
+      "y": 0
+    },
+    {
+      "x": 20,
+      "y": 2
+    }
+  ],
+  "initial_image_setup.tile_shape": [
+    212,
+    303
+  ],
+  "region_select.state": "Done"
+}

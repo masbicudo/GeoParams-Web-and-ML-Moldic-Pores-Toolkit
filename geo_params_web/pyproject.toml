@@ -1,0 +1,39 @@
+[project]
+name = "geo_params_web"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Miguel Angelo", email = "masbicudo@gmail.com"},
+]
+dependencies = [
+    "flask>=3.1.0",
+    "matplotlib>=3.10.3",
+    "numpy>=2.2.5",
+    "opencv-python>=4.11.0.86",
+    "pandas>=2.2.3",
+    "scikit-image>=0.25.2",
+    "numba>=0.61.2",
+    "streamlit>=1.46.1",
+    "python-dotenv>=1.1.1",
+    "scikit-learn>=1.7.1",
+    "seaborn>=0.13.2"
+]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "Unlicensed"}
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.dev-dependencies]
+dev = [
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.30.1",
+    "pip>=25.2",
+    "ipywidgets>=8.1.7",
+    "ipympl>=0.9.7",
+    "pyperclip>=1.9.0",
+]

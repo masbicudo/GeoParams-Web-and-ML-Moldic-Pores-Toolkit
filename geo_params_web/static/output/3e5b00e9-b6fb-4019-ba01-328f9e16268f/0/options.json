@@ -1,0 +1,29 @@
+{
+  "user": {
+    "email": null,
+    "name": null,
+    "anonymize": true,
+    "experience": 2
+  },
+  "image_select.filename": "72.53_jpeg_escal.jpg",
+  "initial_image_setup.min_pore_size": 480,
+  "params_select.clicked_points": [
+    {
+      "x": 27,
+      "y": 8
+    },
+    {
+      "x": 28,
+      "y": 16
+    },
+    {
+      "x": 31,
+      "y": 9
+    }
+  ],
+  "initial_image_setup.tile_shape": [
+    412,
+    242
+  ],
+  "params_select.state": "Done"
+}

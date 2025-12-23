@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container container-base d-flex align-items-center vh-100 flex-column">
+    <div class="col-md-8 container-center">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alert alert-{{ messages[0][0] }}">
+                    {{ messages[0][1] }}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content_1 %}{% endblock %}
+    </div>
+    <style>
+        #footer a {
+            color: #666;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        #footer a:hover {
+            color: darkblue;
+            text-decoration: underline;
+        }
+    </style>
+    <div id="footer" class="bottom">
+        Miguel Angelo S. Bicudo @ Projeto Pre-Sal II/LageSed, QGLab, SageLab/NCE, PPGL/IGeo, PPGI/IC, CCMN @ UFRJ
+        <br>
+        Orientado por Daniel Sadoc Menasché, Leonardo Borghi, Francisco Tognoli e Julia Favoreto
+    </div>
+    <script>
+        footer = document.getElementById('footer')
+        footer.innerHTML = footer.innerHTML
+        .replace(
+            /Miguel.*Bicudo/gu,
+            m => ('<a href="mailto:masbicudo@ic.ufrj.br" target="_blank">'+m+'</a>'
+             + '<a href="https://www.masbicudo.com" target="_blank" rel="noopener noreferrer">⧉</a>')
+        )
+        .replace(
+            /Daniel.*Men\p{L}+/gu,
+            m => '<a href="mailto:sadoc@ic.ufrj.br" target="_blank">'+m+'</a>'
+        )
+        .replace(
+            /Leonardo.*Bor\p{L}+/gu,
+            m => '<a href="mailto:lborghi@geologia.ufrj.br" target="_blank">'+m+'</a>'
+        )
+        .replace(
+            /Francisco.*Tog\p{L}+/gu,
+            m => '<a href="mailto:franciscotognoli@igeo.ufrj.br" target="_blank">'+m+'</a>'
+        )
+        .replace(
+            /Julia.*Fav\p{L}+/gu,
+            m => '<a href="mailto:julia@geologia.ufrj.br" target="_blank">'+m+'</a>'
+        )
+        .replace(
+            'SageLab',
+            '<a href="https://sagelab.nce.ufrj.br" target="_blank">SageLab</a>'
+        )
+        .replace(
+            'NCE',
+            '<a href="https://portal.nce.ufrj.br/index.php/institucional/quem-somos" target="_blank">NCE</a>'
+        )
+        .replace(
+            'Projeto Pre-Sal II',
+            '<a href="https://lagesed.geologia.ufrj.br/projetos-ativos-lagesed" target="_blank">Projeto Pre-Sal II</a>'
+        )
+        .replace(
+            'LageSed',
+            '<a href="https://lagesed.geologia.ufrj.br" target="_blank">LageSed</a>'
+        )
+        .replace(
+            'QGLab',
+            '<a href="https://qglab.geologia.ufrj.br/" target="_blank">QGLab</a>'
+        )
+        .replace(
+            'PPGL',
+            '<a href="https://processoseletivo.geologia.ufrj.br" target="_blank">PPGL</a>'
+        )
+        .replace(
+            'IGeo',
+            '<a href="https://igeo.ufrj.br/" target="_blank">IGeo</a>'
+        )
+        .replace(
+            'PPGI',
+            '<a href="https://www.ppgi.ufrj.br" target="_blank">PPGI</a>'
+        )
+        .replace(
+            'IC',
+            '<a href="https://dcc.ufrj.br/" target="_blank">IC</a>'
+        )
+        .replace(
+            'CCMN',
+            '<a href="https://ccmn.ufrj.br" target="_blank">CCMN</a>'
+        )
+        .replace(
+            'UFRJ',
+            '<a href="https://ufrj.br" target="_blank">UFRJ</a>'
+        );
+    </script>
+    <div class="bottom">
+        <a href="https://sites.google.com/view/geo-params" target="_blank">Saiba mais sobre este trabalho</a>
+    </div>
+</div>
+<script>
+</script>
+{% endblock %}

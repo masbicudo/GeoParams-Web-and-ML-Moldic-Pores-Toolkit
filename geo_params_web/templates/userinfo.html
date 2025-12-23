@@ -1,0 +1,26 @@
+{% extends "base_form.html" %}
+
+{% block title %}Informações do usuário{% endblock %}
+
+{% block content_1 %}
+<script>
+    const user = {{ user | tojson }}
+</script>
+<h2 class="mb-4">Informações do usuário</h2>
+<form method="POST">
+    <div class="form-group mb-3 w-100">
+        <label for="experience">Quão experiente você se considera em análise petrográfica?</label>
+        <select name="experience" id="experience" class="w-100">
+            <option value="0" {% if user.experience == 0 %}selected{% endif %}>[selecione uma opção]</option>
+            <option value="1" {% if user.experience == 1 %}selected{% endif %}>1 - não possuo experiência</option>
+            <option value="2" {% if user.experience == 2 %}selected{% endif %}>2 - estou estudando o assunto</option>
+            <option value="3" {% if user.experience == 3 %}selected{% endif %}>3 - já fiz algumas vezes</option>
+            <option value="4" {% if user.experience == 4 %}selected{% endif %}>4 - trabalho em área relacionada</option>
+            <option value="5" {% if user.experience == 5 %}selected{% endif %}>5 - trabalho nisso o tempo todo</option>
+        </select>
+    </div>
+    <div class="form-group text-end">
+        <button type="submit" class="btn btn-primary">Enviar</button>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,26 @@
+{
+    "2-SMC-1-AL_72,99m_n=_2,5x_cesc.jpg": {
+        "metrics": {
+            "ruler": {
+                "px": 1260,
+                "mm": 5
+            }
+        }
+    },
+    "2-SMC-1-AL_73,97m_n=_2,5x_cesc.jpg": {
+        "metrics": {
+            "ruler": {
+                "px": 1260,
+                "mm": 5
+            }
+        }
+    },
+    "72.53_jpeg_escal.jpg": {
+        "metrics": {
+            "ruler": {
+                "px": 964,
+                "mm": 2
+            }
+        }
+    }
+}

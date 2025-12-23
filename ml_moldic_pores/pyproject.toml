@@ -1,0 +1,86 @@
+[project]
+name = "Pre-Sal-II"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Miguel Angelo", email = "masbicudo@gmail.com"},
+]
+dependencies = [
+    "opencv-python>=4.9.0.80",
+    "matplotlib>=3.8.4",
+    "numba>=0.59.0",
+    "scikit-image>=0.22.0",
+    "imutils>=0.5.4",
+    "scikit-learn>=1.4.1.post1",
+    "tqdm>=4.66.2",
+    "pandas>=2.2.2",
+    "torchvision>=0.19.1",
+    "ipyparallel>=9.0.0",
+    "ipympl>=0.9.7",
+    "python-dotenv>=1.1.1",
+    "k-means-constrained>=0.7.3",
+    "ray>=2.51.0",
+]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "Unlicensed"}
+
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "ipykernel>=6.29.3",
+    "pip>=24.0",
+    "-e file:///${PROJECT_ROOT}/#egg=pre-sal-ii",
+    "pre-commit>=3.8.0",
+    "cython>=3.0.11",
+]
+
+[tool.pdm.resolution]
+# https://stackoverflow.com/questions/77183339/installing-torch-with-gpu-support-but-without-downloading-3-gb-of-duplicated-sil
+# PDM cannot install torch with CUDA support
+excludes = [
+  "torch",
+  "torchvision",
+  "nvidia-cublas-cu12",
+  "nvidia-cuda-cupti-cu12",
+  "nvidia-cuda-nvrtc-cu12",
+  "nvidia-cuda-runtime-cu12",
+  "nvidia-cudnn-cu12",
+  "nvidia-cufft-cu12",
+  "nvidia-curand-cu12",
+  "nvidia-cusolver-cu12",
+  "nvidia-cusparse-cu12",
+  "nvidia-nccl-cu12",
+  "nvidia-nvtx-cu12",
+  "triton",
+]
+[tool.pyprojectx]
+pdm = "pdm==2.12.4"
+
+# commonly used tools
+#black = "black"
+#isort = "isort"
+#pylint = "pylint"
+#pre-commit = "pre-commit"
+#jupyter = ["jupyter", "."]
+
+[tool.pyprojectx.aliases]
+install = "pdm install"
+run = "pdm run"
+outdated = "pdm update --outdated"
+test = "pdm run pytest"
+
+# example aliases
+#clean = "rm -rf .venv .pytest_cache dist"
+#clean-all = "pw@ clean && rm -rf .pyprojectx"
+#black = "black src tests"
+#isort = "isort src tests"
+#check-pylint = "pylint src tests"
+#check-black = "black src tests --check"
+#check = "pw@ check-black && pw@ check-pylint && pw@ test"
+#build = "pw@ install && pw@ check && pw@ pdm build"
+#notebook = "jupyter notebook -y"
+

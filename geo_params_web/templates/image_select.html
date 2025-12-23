@@ -1,0 +1,58 @@
+{% extends "base_form.html" %}
+
+{% block title %}Interactive Image Hover{% endblock %}
+
+{% block content_1 %}
+<style>
+  #main-img {
+    width: 100%;
+  }
+</style>
+<h2>Selecione uma lâmina e depois uma região dela</h2>
+<form method="POST">
+    <div class="mb-3">
+      <select name="filename" id="filename">
+          {% for file in files %}
+              <option value="{{ file }}" {% if file == current_file %}selected{% endif %}>{{ file }}</option>
+          {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      Clique e arraste para selecionar uma região na imagem da lâmina abaixo.
+    </div>
+    <input type="hidden" name="x" id="x" value="{{area_x}}" />
+    <input type="hidden" name="y" id="y" value="{{area_y}}" />
+    <input type="hidden" name="w" id="w" value="{{area_w}}" />
+    <input type="hidden" name="h" id="h" value="{{area_h}}" />
+    <div id="imageContainer" style="position: relative; display: inline-block;">
+      <img id="main-img" src="" draggable="false" />
+      <div id="selectionBox" style="
+          position: absolute;
+          border: 2px dashed red;
+          display: none;
+          pointer-events: none;">
+      </div>
+      <div id="selectionInfo" style="
+          position: absolute;
+          display: none;
+          background: rgba(0, 0, 0, 0.7);
+          color: white;
+          font-size: 12px;
+          padding: 4px 6px;
+          border-radius: 4px;
+          pointer-events: none;
+          z-index: 9999;
+      ">&nbsp;</div>
+    </div>
+    <div class="mb-3">
+      Após selecionar a região, clique no botão "Continuar" para prosseguir com a análise.
+    </div>
+    <div class="form-group text-end mt-3">
+      <button type="submit" class="btn btn-primary">Continuar</button>
+    </div>
+</form>
+<script>
+  const metadata = {{ metadata | tojson }};
+  const image_percentage = {{ image_percentage | tojson }};
+</script>
+{% endblock %}

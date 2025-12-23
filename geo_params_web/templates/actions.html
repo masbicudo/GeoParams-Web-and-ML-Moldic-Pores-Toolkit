@@ -1,0 +1,42 @@
+{% extends "base_form.html" %}
+
+{% block title %}{{lr.str.app_title}}{% endblock %}
+
+{% block content_1 %}
+  <h2>{{lr.str.welcome}}</h2>
+  <div class="m-3">
+    {{lr.str.texts.welcome_paragraph | safe}}
+  </div>
+  {% if has_session %}
+    <div class="m-3">
+      {{lr.str.your_login(user_name)}}
+    </div>
+  {% else %}
+    <div class="m-3">
+      {{lr.str.texts.more_instructions | safe}}
+    </div>
+  {% endif %}
+  <div class="d-flex flex-column gap-4">
+
+    {% if has_session %}
+    <a href="{{ url_for('index') }}"
+      class="btn btn-danger"
+      >{{lr.str.exit}}</a>
+    {% else %}
+    <a href="{{ url_for('user_id') }}"
+      class="btn btn-success"
+      >{{lr.str.enter}}</a>
+    {% endif %}
+
+    {% if has_session %}
+    <a href="{{ url_for('userinfo') }}?session_id={{session_id}}"
+      class="btn btn-primary"
+      >{{lr.str.params_c_k_segment_porosity}}</a>
+    {% endif %}
+
+    <a href="/stats/"
+      class="btn btn-light"
+      >{{lr.str.statistics}}</a>
+
+  </div>
+{% endblock %}

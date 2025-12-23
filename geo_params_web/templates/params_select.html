@@ -1,0 +1,91 @@
+{% extends "base_form.html" %}
+
+{% block title %}Interactive Image Hover{% endblock %}
+
+{% block content_1 %}
+  <div id="progress"></div>
+  <style>
+    .hidden {
+      display: none;
+    }
+  </style>
+  <div id="everything" class="hidden">
+    <table class="image-table">
+      <tr>
+        <th>Espaço de Parâmetros:</th>
+        <th>Segmentação:</th>
+        <th>Lâmina Petrográfica:</th>
+      </tr>
+      <tr>
+        <td><img id="main-img" src="/static/output/{{session_id}}/{{counter}}/main_image.png" style="image-rendering: pixelated; width: 100%; height: auto;"></td>
+        <td><div id="preview-img"
+            style="
+              width: 100px;
+              height: 100px;
+              background-image: url('/static/output/{{session_id}}/{{counter}}/stitched_tiles.png');
+              background-repeat: no-repeat;
+              background-size: auto;
+              image-rendering: pixelated;
+            ">
+        </div></td>
+        <td><img id="orig-img" src="/static/output/{{session_id}}/{{counter}}/cropped.jpg" style="image-rendering: pixelated;" /></td>
+      </tr>
+    </table>
+    <div style="overflow: hidden;">
+      <span style="float: left; margin: 0.5em;">
+        <input type="range" id="my-slider" min="100" max="10000" step="10" value="{{min_pore_size}}">
+        <span id="slider-value">{{min_pore_size}}</span>
+        <button onclick="submitSlider()" class="btn btn-primary">Alterar</button>
+      </span>
+    </div>
+    <div class="form-group mb-3 w-100">
+      <h3>Coordenadas Selecionadas</h3>
+      <p>Arraste o cursor sobre a imagem do espaço de parâmetros para ver a segmentação.
+      Clique em um ponto para etiquetá-lo como adequado.</p>
+      <ul id="coord-list"  class="row list-group"></ul>
+    </div>
+    <div class="form-group mb-3 w-100">
+      <label for="priority" class="form-label">{{lr.str.priority_field_description}}</label>
+      <select name="priority" id="priority">
+        <option value="none">-- Selecione uma opção --</option>
+        <option value="connectivity">Privilegiei conectividade correta dos poros</option>
+        <option value="size">Privilegiei o tamanho correto dos poros</option>
+        <option value="shape">Privilegiei a forma correta dos poros</option>
+      </select>
+    </div>
+    <div>
+      Nesta tela há 3 imagens. A primeira é o espaço de parâmetros
+      sendo que no eixo X temos "Black(max)" e no eixo Y temos "Cian(min)".
+      Esses parâmetros determinam o máximo do canal de cor preta,
+      e o mínimo do canal de cor ciano, respectivamente, que o pixel deve
+      ter para ser considerado como parte do poro. As cores nessa imagem
+      indicam a quantidade de componentes conexas detectadas usando os
+      parâmetros correspondentes durante a segmentação.
+      Vermelho = 1, Azul = 2, Verde = 3, Branco = 4 ou mais.
+      Ao arrastar o cursor sobre a imagem do espaço de parâmetros,
+      a segunda imagem é atualizada mostrando como fica a segmentação,
+      usando as cores para indicar componentes conexas.
+      A terceira imagem é o recorte da imagem original,
+      que deve ser comparada com a segunda para ver se a segmentação
+      ficou adequada. Ao clicar num pixel no espaço de parâmetros
+      ele será etiquetado como sendo adequado. A etiqueta poderá ser
+      desfeita posteriormente caso haja algum engano.
+    </div>
+    <div style="text-align: right; overflow: hidden; padding: 1em;">
+        <button onclick="restart('done')" class="btn btn-primary">Salvar</button>
+        <button onclick="restart('cancel')" class="btn btn-danger">Descartar</button>
+    </div>
+    <script>
+      const clickedPoints = {{ clicked_points | tojson }};
+      let tile_shape = {{ tile_shape | tojson }};
+      const metadata = {{ metadata | tojson }};
+      const filename = {{ filename | tojson }};
+      const counter = {{ counter | tojson }};
+      const lr = { str: {
+        processing: "{{ lr.str.processing }}",
+        finished_processing: "{{ lr.str.finished_processing }}",
+        progress: "{{ lr.str.progress }}"
+      }}
+    </script>
+  </div>
+{% endblock %}

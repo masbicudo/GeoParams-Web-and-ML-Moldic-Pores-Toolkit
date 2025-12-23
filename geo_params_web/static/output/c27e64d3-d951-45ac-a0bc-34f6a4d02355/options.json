@@ -1,0 +1,29 @@
+{
+  "user": {
+    "experience": 5,
+    "email": null,
+    "name": null,
+    "anonymize": true
+  },
+  "image_select.filename": "2-SMC-1-AL_72,99m_n=_2,5x_cesc.jpg",
+  "initial_image_setup.min_pore_size": 480,
+  "region_select.clicked_points": [
+    {
+      "x": 30,
+      "y": 1
+    },
+    {
+      "x": 29,
+      "y": 2
+    },
+    {
+      "x": 31,
+      "y": 1
+    }
+  ],
+  "initial_image_setup.tile_shape": [
+    189,
+    146
+  ],
+  "region_select.state": "Done"
+}

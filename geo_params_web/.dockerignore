@@ -1,0 +1,7 @@
+__pycache__
+.venv
+.vscode
+.dockerignore
+dockerfile
+docker-compose.yml
+session.json
