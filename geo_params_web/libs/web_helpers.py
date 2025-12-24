@@ -65,17 +65,63 @@ def check_timeout(session_id, task_name):
         if alive_tag is not None and elapsed > dt.timedelta(seconds=task["timeout"]):
             alive_tag["state"] = "Timeout"
 
+def sanitize_session_store(store):
+    clean = {}
+
+    for session_id, session in store.items():
+        session_copy = {}
+
+        for key, value in session.items():
+            if key == "tasks":
+                clean_tasks = {}
+                for task_name, task in value.items():
+                    if task is None:
+                        continue
+                    task_copy = dict(task)
+                    task_copy.pop("alive_tag", None)
+                    task_copy.pop("cache", None)
+                    clean_tasks[task_name] = task_copy
+                session_copy["tasks"] = clean_tasks
+            else:
+                session_copy[key] = value
+
+        clean[session_id] = session_copy
+
+    return clean
+
 def save_session():
     with global_lock:
-        with open("session.json", "w") as fp:
-            json.dump(session_store, fp, indent=2, default=lambda o: None)
+        tmp = "session.json.tmp"
+        safe_store = sanitize_session_store(session_store)
+        with open(tmp, "w", encoding="utf-8") as fp:
+            json.dump(safe_store, fp, indent=2)
+        os.replace(tmp, "session.json")
+
 
 def load_session():
     global session_store
     with global_lock:
-        if os.path.isfile("session.json"):
-            with open("session.json", "r") as fp:
+        if not os.path.isfile("session.json"):
+            session_store = {}
+            return
+
+        try:
+            with open("session.json", "r", encoding="utf-8") as fp:
                 session_store = json.load(fp)
+
+        except json.JSONDecodeError:
+            # Corrupted session file (e.g. interrupted write)
+            print(
+                "[WARNING] session.json is corrupted. "
+                "Discarding stored sessions and starting fresh."
+            )
+            session_store = {}
+
+            # Optional: preserve the corrupted file for debugging
+            try:
+                os.rename("session.json", "session.json.corrupted")
+            except OSError:
+                pass
 
 def ensure_session(func):
     @wraps(func)

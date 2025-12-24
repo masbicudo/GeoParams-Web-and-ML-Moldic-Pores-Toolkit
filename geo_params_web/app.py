@@ -283,18 +283,13 @@ def index(session_id):
     session = get_session(session_id)
     
     user_name = None
-    if session is not None and "name" in session.get("options", {}).get("user", {}):
+    if session is not None:
         renew = bool(request.args.get('renew', None))
         if renew:
             session["counter"] += 1
             return redirect(url_for("index", session_id=session_id, **(request.view_args or {})))
     
-        user_name = session["options"]["user"]["name"]
-        if session["options"]["user"]["anonymize"]:
-            user_name = lr.str.anonymous_user(user_name[:8])
-    
-    if user_name is None and session is not None:
-        return redirect(url_for("index"))
+    user_name = lr.str.anonymous_user("participant")
     
     return render_template('actions.html',
                            has_session=session is not None,
@@ -303,7 +298,8 @@ def index(session_id):
                            user_name=user_name,
                            )
 
-@app.route('/user_id', methods=['GET', 'POST'])
+
+@app.route('/user_id', methods=['GET'])
 @ensure_session
 def user_id(session_id):
     session = get_session(session_id)
@@ -311,40 +307,12 @@ def user_id(session_id):
         raise ValueError(f"Session {session_id} not found")
     
     user = session.setdefault("options", {}).setdefault("user", {})
-    if request.method == 'GET':
-        email = user.setdefault("email", "")
-        name = user.setdefault("name", "")
-        anonymize = user.setdefault("anonymize", False)
-        return render_template('user_id.html',
-                               session_id=session_id,
-                               user=user,
-                               )
-    elif request.method == 'POST':
-        email = request.form.get('email') or ""
-        name = request.form.get('name') or ""
-        anonymize = user["anonymize"] = bool(request.form.get('anonymize'))
-        if anonymize:
-            import hashlib
-            if email:
-                hash_object = hashlib.sha256()
-                hash_object.update(email.encode('utf-8'))
-                email = hash_object.hexdigest()
-            if name:
-                hash_object = hashlib.sha256()
-                hash_object.update(name.encode('utf-8'))
-                name = hash_object.hexdigest()
-        user["email"] = email
-        user["name"] = name
-        
-        if not email:
-            flash(lr.str.userinfo_email_required, 'error')
-            return redirect(url_for("userinfo",
-                                    session_id=session_id))
-        return redirect(url_for("index",
-                                session_id=session_id))
+    # NOTE:
+    # Personal identifiers are not collected or stored in the public release.
+    user["email"] = None
+    user["name"] = None
     
-    # This should never be reached, but ensures all paths return
-    return "Method not allowed", 405
+    return redirect(url_for("index", session_id=session_id))
 
 @app.route('/userinfo', methods=['GET', 'POST'])
 @ensure_session
@@ -459,31 +427,18 @@ def params_select(session_id):
         # This should never be reached, but ensures all paths return
         return "Method not allowed", 405
 
-@app.route('/end_review', methods=['GET', 'POST'])
+# NOTE:
+# This endpoint previously collected free-text user feedback during
+# supervised study sessions. It is disabled in the public release to
+# avoid collecting potentially identifiable information.
+@app.route('/end_review', methods=['GET'])
 @ensure_session
 def end_review(session_id):
     session = get_session(session_id)
     if session is None:
         raise ValueError(f"Session {session_id} not found")
-    if request.method == 'GET':
-        if os.path.isfile(f"static/output/{session_id}/{session['counter']}/end_review.txt"):
-            with open(f"static/output/{session_id}/{session['counter']}/end_review.txt", "r") as f:
-                text = f.read()
-        else:
-            text = ""
-        return render_template("end_review.html",
-                               session_id=session_id,
-                               text=text)
 
-    elif request.method == 'POST':
-        text = request.form.get('text', '')
-        with open(f"static/output/{session_id}/{session['counter']}/end_review.txt", "w") as f:
-            f.write(text)
-        
-        return redirect(url_for("index", session_id=session_id, renew=True))
-
-    # This should never be reached, but ensures all paths return
-    return "Method not allowed", 405
+    return redirect(url_for("index", session_id=session_id, renew=True))
 
 def getImageFiles():
     IMAGE_FILES_DIR = "static/imgs_sections"
@@ -497,6 +452,15 @@ def getImageFiles():
 def image_select(session_id):
     if request.method == 'GET':
         files = getImageFiles()
+        if not files:
+            return (
+                "No processed images were found. "
+                "Please generate the reduced images by running make-images.ipynb "
+                "before starting the application. "
+                "See README.md for setup instructions.",
+                400,
+            )
+
         filename = request.form.get('filename', files[0])
         x = request.form.get('x', "0")
         y = request.form.get('y', "0")
@@ -693,9 +657,12 @@ def delete_point(session_id):
 if __name__ == "__main__":
     load_session()
     try:
-        if os.getenv('FLASK_ENV') == 'development':
-            app.run(debug=True)
+        if os.getenv("FLASK_ENV") == "development":
+            app.run(debug=True, use_reloader=False)
         else:
-            app.run(host='0.0.0.0', port=5000)
+            app.run(host="0.0.0.0", port=5000)
     finally:
-        save_session()
+        # Only save session in the actual serving process,
+        # not in the Flask reloader bootstrap.
+        if os.getenv("WERKZEUG_RUN_MAIN") == "true":
+            save_session()

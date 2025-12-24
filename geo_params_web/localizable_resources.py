@@ -157,16 +157,15 @@ class str:
         }[lang_code]
         more_instructions = {
                 "en-US": f"""
-                By entering the application, you will be presented to
+                By entering the application, you will create a session
+                and will be presented to
                 more options to collect data and parameters about
-                geological features. You will be given the option
-                to anonymise your personal data if you wish.
+                geological features.
                 """,
                 "pt-BR": f"""
-                Ao entrar no aplicativo, você será apresentado a
-                mais opções para coletar dados e parâmetros sobre
-                características geológicas. Você terá a opção
-                de anonimizar seus dados pessoais, se desejar.
+                Ao entrar no aplicativo, você criará uma sessão
+                e será apresentado a mais opções para coletar dados
+                e parâmetros sobre características geológicas.
                 """
         }[lang_code]
     select_experience_levels = {
@@ -228,4 +227,8 @@ class str:
     users_stats = {
             "en-US": 'Users Stats',
             "pt-BR": 'Estatísticas dos Usuários',
+        }[lang_code]
+    exit_session = {
+            "en-US": 'You can exit the current session clicking the button below.',
+            "pt-BR": 'Você pode sair da sessão atual clicando no botão abaixo.',
         }[lang_code]

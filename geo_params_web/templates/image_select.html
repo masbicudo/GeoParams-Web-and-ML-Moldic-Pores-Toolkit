@@ -8,30 +8,39 @@
     width: 100%;
   }
 </style>
-<h2>Selecione uma lâmina e depois uma região dela</h2>
+
+<h2>Select a thin section and then a region of interest</h2>
+
 <form method="POST">
     <div class="mb-3">
       <select name="filename" id="filename">
           {% for file in files %}
-              <option value="{{ file }}" {% if file == current_file %}selected{% endif %}>{{ file }}</option>
+              <option value="{{ file }}" {% if file == current_file %}selected{% endif %}>
+                  {{ file }}
+              </option>
           {% endfor %}
       </select>
     </div>
+
     <div class="mb-3">
-      Clique e arraste para selecionar uma região na imagem da lâmina abaixo.
+      Click and drag to select a region on the thin-section image below.
     </div>
-    <input type="hidden" name="x" id="x" value="{{area_x}}" />
-    <input type="hidden" name="y" id="y" value="{{area_y}}" />
-    <input type="hidden" name="w" id="w" value="{{area_w}}" />
-    <input type="hidden" name="h" id="h" value="{{area_h}}" />
+
+    <input type="hidden" name="x" id="x" value="{{ area_x }}" />
+    <input type="hidden" name="y" id="y" value="{{ area_y }}" />
+    <input type="hidden" name="w" id="w" value="{{ area_w }}" />
+    <input type="hidden" name="h" id="h" value="{{ area_h }}" />
+
     <div id="imageContainer" style="position: relative; display: inline-block;">
       <img id="main-img" src="" draggable="false" />
+
       <div id="selectionBox" style="
           position: absolute;
           border: 2px dashed red;
           display: none;
           pointer-events: none;">
       </div>
+
       <div id="selectionInfo" style="
           position: absolute;
           display: none;
@@ -44,13 +53,16 @@
           z-index: 9999;
       ">&nbsp;</div>
     </div>
+
     <div class="mb-3">
-      Após selecionar a região, clique no botão "Continuar" para prosseguir com a análise.
+      After selecting the region, click the <strong>Continue</strong> button to proceed with the analysis.
     </div>
+
     <div class="form-group text-end mt-3">
-      <button type="submit" class="btn btn-primary">Continuar</button>
+      <button type="submit" class="btn btn-primary">Continue</button>
     </div>
 </form>
+
 <script>
   const metadata = {{ metadata | tojson }};
   const image_percentage = {{ image_percentage | tojson }};

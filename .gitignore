@@ -188,3 +188,7 @@ stitched_tiles.png
 /geo_params_web/session.json
 /ml_moldic_pores/data/classes.txt
 *.uncommitted
+/geo_params_web/static/imgs_sections/**/*.jpg
+desktop.ini
+/ml_moldic_pores/data/thin_sections/
+/ml_moldic_pores/data/classificada_01/

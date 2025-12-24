@@ -80,10 +80,13 @@ def load_data_from_files(debug=False, print=print):
                         'min_pore_size': min_pore_size,
                         'clicked_x': point['x']*8,
                         'clicked_y': point['y']*8,
+                        
+                        # data removed (set to null) for privacy concerns
                         'review': review_text,
                         'name': name,
                         'email': email,
                         'anonymize': anonymize,
+                        
                         'folder_name': folder_name,
                         'canceled': canceled,
                     }
@@ -93,6 +96,8 @@ def load_data_from_files(debug=False, print=print):
     return pd.DataFrame(data)
 
 def get_available_images(filter_user_name, debug=False):
+    # This function is only used when participant-level views are enabled.
+    # In public/anonymized mode, it should not be called.
     
     path_pattern = 'static/output/*/*/options.json'
     
@@ -126,7 +131,9 @@ def get_available_images(filter_user_name, debug=False):
         
         tiles_images = []
         user_info = {
+            # data removed (set to null) for privacy concerns
             'name': user_name,
+            
             'folder_name': os.path.dirname(file),
             'cropped_image': cropped_image,
             'param_space_image': param_space_image,

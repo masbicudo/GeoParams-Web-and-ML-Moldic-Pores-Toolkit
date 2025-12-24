@@ -311,9 +311,11 @@ if (current_endpoint == "params_select")
                         lr.str.finished_processing;
                     updateImages();
                     document.getElementById("everything").classList.remove("hidden");
+                    document.getElementById("hide-when-processing-done").classList.add("hidden");
                 }
                 if (task.state == "Requested") {
-                    document.getElementById("everything").classList.add("hidden");
+                    document.getElementById("everything").classList.remove("hidden");
+                    document.getElementById("hide-when-processing-done").classList.add("hidden");
                     if (task.progress) {
                         const p = task.progress.step/task.progress.total_steps;
                         document.getElementById("progress").innerText =
