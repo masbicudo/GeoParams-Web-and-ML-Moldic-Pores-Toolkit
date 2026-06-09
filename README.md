@@ -79,8 +79,7 @@ From the repository root, run:
 python smoke_test_notebooks.py
 ```
 
-This validates that the published notebooks can be parsed and do not reference
-historical local paths from the research sandbox. It also checks that the
+This validates that the published notebooks can be parsed and that the
 expected dataset and generated image-cache paths exist after setup. It does
 not execute long-running model-training notebooks.
 
