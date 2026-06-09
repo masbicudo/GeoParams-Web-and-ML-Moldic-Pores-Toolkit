@@ -19,8 +19,18 @@ Due to GitHub’s file size limits (100 MB per file), the high-resolution
 petrographic thin-section images used in this study cannot be hosted
 directly in this repository.
 
-Copy the thin-section files from `GoogleDrive/data` to `ml_moldic_pores/data`:
+Download the public dataset from Google Drive and place the dataset folders in
+the repository root as `datasets/`:
 - [https://drive.google.com/drive/folders/1s-NAWbgukQG-1Q3M5MpO808XRqA1QVw4?usp=sharing](https://drive.google.com/drive/folders/1s-NAWbgukQG-1Q3M5MpO808XRqA1QVw4?usp=sharing)
+
+Expected local layout:
+
+```text
+datasets/
+  article_thin_sections/
+  generalization_test_thin_sections/
+  pore_type_training/
+```
 
 The reduced images required for running the data collection app are generated locally from these files.
 
@@ -91,24 +101,20 @@ From inside the `user_params_porosity` directory:
 
 ```bash
 ./install.sh
-pdm run python imports.py
-pdm run python measure_porosity_from_params.py \
-  "../ml_moldic_pores/data/thin_sections/*.jpg" \
-  --crop-metadata ../geo_params_web/static/imgs_sections/cuts/no-border/cut-metadata.json \
-  --output-dir data/output/public_thin_sections
+pdm run python quick_test.py
 ```
 
-This writes `porosity_summary.csv`, `porosity_by_parameter.csv`, and mean
-binarization masks to the selected output directory. The crop metadata is used
-to exclude image borders from the measurements.
+This imports the collected user parameters, applies them to one public thin
+section, and prints a short porosity summary. The crop metadata is used to
+exclude image borders from the measurements.
 
 ## Data collection app
 
 The data collection application is located in the `geo_params_web` project folder.
 
 1. Open Visual Studio Code from the `geo_params_web` folder.
-2. Open the notebook at `notebooks/make-images.ipynb` from within VS Code and run all cells to generate the reduced images used by the app.
-3. Run `install.sh` to install the application requirements.
+2. Run `install.sh` to install the application requirements.
+3. Run `pdm run python prepare_web_images.py` to generate the local image cache used by the app.
 4. Run `run_app_dev.sh` to start the main app.
 5. Run `run_stats_sl.sh` to start the statistics app.
 
@@ -119,7 +125,8 @@ The machine-learning models are located in the `ml_moldic_pores` project folder.
 To work with the machine-learning notebooks:
 1. Open Visual Studio Code in the `ml_moldic_pores` project folder
 2. Run `./install.sh` to create the local PDM environment
-3. Open the notebooks (inside `notebooks` folder) from within Visual Studio Code (the `.vscode` settings are provided; Visual Studio Code may prompt for
+3. Run `pdm run python imports.py` to import the user-parameter table and prepare local ML image derivatives from `datasets/`.
+4. Open the notebooks (inside `notebooks` folder) from within Visual Studio Code (the `.vscode` settings are provided; Visual Studio Code may prompt for
 installation of the required Jupyter extensions.)
 
 Example usage:
@@ -127,6 +134,7 @@ Example usage:
 ```bash
 cd ml_moldic_pores
 ./install.sh
+pdm run python imports.py
 code .
 ```
 
@@ -142,6 +150,16 @@ porosity measurement. It consumes the anonymized parameter table exported by
 `geo_params_web` and applies those $(C_{\min}, K_{\max})$ thresholds to any
 set of input images. Optional crop metadata can be supplied as JSON to ensure
 that only valid central thin-section areas are measured.
+
+Default analyses are available as short commands:
+
+```bash
+cd user_params_porosity
+pdm run python run_article_thin_sections.py
+pdm run python run_generalization_test.py
+```
+
+Outputs are written under `user_params_porosity/data/output/`.
 
 ## Related research
 

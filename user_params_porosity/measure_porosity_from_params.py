@@ -75,6 +75,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def friendly_missing_path_message(path: Path, role: str) -> str:
+    return (
+        f"{role} was not found:\n"
+        f"  {path}\n\n"
+        "Please make sure the public dataset has been downloaded from Google "
+        "Drive and placed in the repository's datasets directory. See the "
+        "repository README.md for the expected layout."
+    )
+
+
 def expand_image_inputs(inputs: list[str]) -> list[Path]:
     files: list[Path] = []
 
@@ -99,6 +109,9 @@ def load_crop_metadata(metadata_file: str | None) -> dict[str, dict[str, int]]:
         return {}
 
     path = Path(metadata_file)
+    if not path.exists():
+        raise FileNotFoundError(friendly_missing_path_message(path, "Crop metadata"))
+
     with path.open("r", encoding="utf-8") as fp:
         raw_data = json.load(fp)
 
@@ -269,11 +282,21 @@ def measure_image(
     return summary, per_param_rows, mean_image, image
 
 
-def main() -> int:
-    args = parse_args()
-    params_path = Path(args.params)
-    output_dir = Path(args.output_dir)
+def run_analysis(
+    image_inputs: list[str],
+    params_path: str | Path = "data/c_min_k_max_params.csv",
+    crop_metadata_path: str | Path | None = None,
+    output_dir: str | Path = "data/output/porosity_from_params",
+    thresholds: list[float] | tuple[float, ...] = DEFAULT_THRESHOLDS,
+    write_mean_images: bool = True,
+    write_cropped_images: bool = False,
+) -> tuple[Path, Path]:
+    params_path = Path(params_path)
+    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not params_path.exists():
+        raise FileNotFoundError(friendly_missing_path_message(params_path, "Parameter CSV"))
 
     params_df = pd.read_csv(params_path)
     required_columns = {"clicked_x", "clicked_y"}
@@ -281,10 +304,16 @@ def main() -> int:
     if missing:
         raise ValueError(f"Missing required columns in {params_path}: {sorted(missing)}")
 
-    crop_metadata = load_crop_metadata(args.crop_metadata)
-    image_paths = expand_image_inputs(args.images)
+    crop_metadata = load_crop_metadata(None if crop_metadata_path is None else str(crop_metadata_path))
+    image_paths = expand_image_inputs(image_inputs)
     if not image_paths:
-        raise ValueError("No image files were found.")
+        joined_inputs = "\n  ".join(image_inputs)
+        raise FileNotFoundError(
+            "No image files were found from these inputs:\n"
+            f"  {joined_inputs}\n\n"
+            "Please make sure the public dataset has been downloaded from "
+            "Google Drive and placed in the repository's datasets directory."
+        )
 
     summary_rows: list[dict[str, Any]] = []
     all_per_param_rows: list[dict[str, Any]] = []
@@ -297,18 +326,18 @@ def main() -> int:
             crop_metadata,
         )
 
-        for threshold in args.thresholds:
+        for threshold in thresholds:
             key = f"porosity_consensus_{threshold:g}"
             summary[key] = float(np.mean(mean_image >= threshold * 255))
 
         summary_rows.append(summary)
         all_per_param_rows.extend(per_param_rows)
 
-        if not args.no_mean_images:
+        if write_mean_images:
             out_image = output_dir / f"mean_mask_{clean_stem(image_path)}.png"
             cv2.imwrite(str(out_image), mean_image.astype(np.uint8))
 
-        if args.write_cropped_images:
+        if write_cropped_images:
             out_image = output_dir / f"cropped_input_{clean_stem(image_path)}.png"
             cv2.imwrite(str(out_image), measured_image)
 
@@ -322,11 +351,30 @@ def main() -> int:
 
     print(f"Wrote {summary_file}")
     print(f"Wrote {per_param_file}")
-    if not args.no_mean_images:
+    if write_mean_images:
         print(f"Wrote mean masks to {output_dir}")
+
+    return summary_file, per_param_file
+
+
+def main() -> int:
+    args = parse_args()
+    run_analysis(
+        image_inputs=args.images,
+        params_path=args.params,
+        crop_metadata_path=args.crop_metadata,
+        output_dir=args.output_dir,
+        thresholds=args.thresholds,
+        write_mean_images=not args.no_mean_images,
+        write_cropped_images=args.write_cropped_images,
+    )
 
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        print(f"\n[ERROR] {exc}")
+        raise SystemExit(1)

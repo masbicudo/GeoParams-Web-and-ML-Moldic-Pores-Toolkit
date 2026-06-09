@@ -201,6 +201,8 @@ desktop.ini
 /user_params_porosity/data/**/*.csv
 /user_params_porosity/data/output/
 !/user_params_porosity/data/__PASTE_IMAGE_DATA_FILES_HERE__
+/ml_moldic_pores/out/
+/ml_moldic_pores/models/
 /datasets/**/*.jpg
 /datasets/**/*.jpeg
 /datasets/**/*.png

@@ -18,6 +18,10 @@ from pre_sal_ii.training.image_clustering import cluster_pixels_kmeans_constrain
 
 logger = logging.getLogger(__name__)
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DATA_DIR = PROJECT_ROOT / "data"
+OUT_DIR = PROJECT_ROOT / "out"
+
 class MyTrainer101x101to32x32(Trainer):
     def __init__(
                 self, model, optimizer, criterion,
@@ -51,8 +55,13 @@ class MyTrainer101x101to32x32(Trainer):
 def get_input_image():
     
     image_name = "ML-tste_original"
-    path = f"../out/classificada_01/{image_name}_25.jpg"
-    inputImage_no_gamma: np.ndarray = cv2.imread(path)
+    path = OUT_DIR / "pore_type_training" / f"{image_name}_25.jpg"
+    inputImage_no_gamma: np.ndarray = cv2.imread(str(path))
+    if inputImage_no_gamma is None:
+        raise FileNotFoundError(
+            f"Could not load {path}. Run `pdm run python imports.py` "
+            "from the ml_moldic_pores directory."
+        )
     inputImage = adjust_gamma(inputImage_no_gamma, 0.5)
     
     return inputImage, inputImage_no_gamma
@@ -99,8 +108,13 @@ def get_probability_maps_simple(inputImage):
 
 def load_manually_categorized_image():
     image_name = "ML-tste_classidicada"
-    path = f"../out/classificada_01/{image_name}_25.jpg"
-    inputImage_cl = cv2.imread(path)
+    path = OUT_DIR / "pore_type_training" / f"{image_name}_25.jpg"
+    inputImage_cl = cv2.imread(str(path))
+    if inputImage_cl is None:
+        raise FileNotFoundError(
+            f"Could not load {path}. Run `pdm run python imports.py` "
+            "from the ml_moldic_pores directory."
+        )
     binaryImage_clRed: np.ndarray = cv2.inRange(
         inputImage_cl,
         #  B,   G,   R
@@ -137,7 +151,7 @@ def filter_central_objects(image: np.ndarray) -> np.ndarray:
 
 
 def get_kmc_model(binaryImage_clRed, debug=False) -> KMeansConstrained:
-    cache_path = Path("../models/kmc_model_1.pkl")
+    cache_path = PROJECT_ROOT / "models" / "kmc_model_1.pkl"
     cache_path.parent.mkdir(exist_ok=True)
 
     if cache_path.exists():
@@ -158,7 +172,7 @@ def get_kmc_model(binaryImage_clRed, debug=False) -> KMeansConstrained:
 
 
 def get_mean_stdev(inputImage_no_gamma):
-    df = pd.read_csv("../data/c_min_k_max_params.csv")
+    df = pd.read_csv(DATA_DIR / "c_min_k_max_params.csv")
     xs = df["clicked_x"].astype(int)
     ys = df["clicked_y"].astype(int)
     mean_img, _, _ = data_models.compute_mean_image(inputImage_no_gamma, xs, ys, show_progress=True)
