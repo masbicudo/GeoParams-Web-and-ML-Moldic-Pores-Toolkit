@@ -455,8 +455,9 @@ def image_select(session_id):
         if not files:
             return (
                 "No processed images were found. "
-                "Please generate the reduced images by running make-images.ipynb "
-                "before starting the application. "
+                "Please generate the reduced images by running "
+                "`pdm run python prepare_web_images.py` before starting the "
+                "application. "
                 "See README.md for setup instructions.",
                 400,
             )

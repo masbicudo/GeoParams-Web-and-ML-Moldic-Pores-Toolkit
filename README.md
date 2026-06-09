@@ -71,6 +71,19 @@ to incorrect paths or missing dependencies.
 A minimal quick test is provided for validating the Python environment and
 core data structures without requiring images or GPU support.
 
+### Notebook smoke test
+
+From the repository root, run:
+
+```bash
+python smoke_test_notebooks.py
+```
+
+This validates that the published notebooks can be parsed and do not reference
+historical local paths from the research sandbox. It also checks that the
+expected dataset and generated image-cache paths exist after setup. It does
+not execute long-running model-training notebooks.
+
 ### Command-line quick test (recommended)
 
 From inside the `geo_params_web` directory, run:

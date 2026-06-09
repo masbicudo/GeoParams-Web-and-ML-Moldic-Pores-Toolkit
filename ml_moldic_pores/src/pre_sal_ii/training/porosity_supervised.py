@@ -255,28 +255,28 @@ if __name__ == "__main__":
     import os
     print(os.getcwd())
     
-    os.chdir("../../../notebooks/")
+    os.chdir("../../../")
     
     image_name = "ML-tste_original"
-    path = f"../data/classificada_01/{image_name}.jpg"
-    scale_image_and_save(path, "../out/classificada_01/", 25)
-    path = f"../out/classificada_01/{image_name}_25.jpg"
+    path = f"../datasets/pore_type_training/{image_name}.jpg"
+    scale_image_and_save(path, "out/pore_type_training/", 25)
+    path = f"out/pore_type_training/{image_name}_25.jpg"
 
     image_name_classes = "ML-tste_classidicada"
-    path_classes = f"../data/classificada_01/{image_name_classes}.jpg"
-    scale_image_and_save(path_classes, "../out/classificada_01/", 25)
-    path_classes = f"../out/classificada_01/{image_name_classes}_25.jpg"
+    path_classes = f"../datasets/pore_type_training/{image_name_classes}.jpg"
+    scale_image_and_save(path_classes, "out/pore_type_training/", 25)
+    path_classes = f"out/pore_type_training/{image_name_classes}_25.jpg"
 
-    image_name_target = "122.20_jpeg_escal"
-    path_target = f"../data/thin_sections/{image_name_target}.jpg"
-    scale_image_and_save(path_target, "../out/thin_sections_4x/", 25)
-    path_target = f"../out/thin_sections_4x/{image_name_target}_25.jpg"
+    image_name_target = "72.53_jpeg_escal"
+    path_target = f"../datasets/article_thin_sections/{image_name_target}.jpg"
+    scale_image_and_save(path_target, "out/thin_sections_4x/", 25)
+    path_target = f"out/thin_sections_4x/{image_name_target}_25.jpg"
     
     for gamma in np.arange(0.3, 0.71, 0.1):
-        os.makedirs("../models/varying_gamma/", exist_ok=True)
-        model_path = f"../models/varying_gamma/supervised-1-gamma={gamma:.2f}.bin"
-        os.makedirs("../out/varying_gamma_model_preds/", exist_ok=True)
-        result_image_path = f"../out/varying_gamma_model_preds/sup_pred_{image_name}_gamma={gamma:.2f}.jpg"
+        os.makedirs("models/varying_gamma/", exist_ok=True)
+        model_path = f"models/varying_gamma/supervised-1-gamma={gamma:.2f}.bin"
+        os.makedirs("out/varying_gamma_model_preds/", exist_ok=True)
+        result_image_path = f"out/varying_gamma_model_preds/sup_pred_{image_name}_gamma={gamma:.2f}.jpg"
         if not os.path.isfile(result_image_path):
             if os.path.isfile(model_path):
                 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
