@@ -192,3 +192,17 @@ stitched_tiles.png
 desktop.ini
 /ml_moldic_pores/data/thin_sections/
 /ml_moldic_pores/data/classificada_01/
+/ml_moldic_pores/data/output/
+/user_params_porosity/data/**/*.jpg
+/user_params_porosity/data/**/*.jpeg
+/user_params_porosity/data/**/*.png
+/user_params_porosity/data/**/*.tif
+/user_params_porosity/data/**/*.tiff
+/user_params_porosity/data/**/*.csv
+/user_params_porosity/data/output/
+!/user_params_porosity/data/__PASTE_IMAGE_DATA_FILES_HERE__
+/datasets/**/*.jpg
+/datasets/**/*.jpeg
+/datasets/**/*.png
+/datasets/**/*.tif
+/datasets/**/*.tiff

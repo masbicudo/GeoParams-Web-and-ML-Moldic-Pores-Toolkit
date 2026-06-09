@@ -1,0 +1,23 @@
+[project]
+name = "user-params-porosity"
+version = "0.1.0"
+description = "Apply collected user segmentation parameters to petrographic images"
+authors = [
+    {name = "Miguel Angelo", email = "masbicudo@gmail.com"},
+]
+dependencies = [
+    "numpy>=2.2.5",
+    "opencv-python>=4.11.0.86",
+    "pandas>=2.2.3",
+]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "Unlicensed"}
+
+[tool.pdm]
+distribution = false
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.30.1",
+]

@@ -30,13 +30,18 @@ they are downloaded.
 ### Running notebooks
 
 All Jupyter Notebooks in this project are prepared to be used from Visual Studio Code.
+The included VS Code settings run notebooks from the corresponding subproject
+root directory, so relative paths are resolved consistently when the subproject
+folder is opened as the workspace.
 
 ## Project structure and usage
 
-This repository contains two related but independent subprojects:
+This repository contains three related but independent subprojects:
 
 - `geo_params_web` — data collection and statistics application
 - `ml_moldic_pores` — machine-learning models and analysis notebooks
+- `user_params_porosity` — applies collected user parameters to new images
+  and exports porosity measurements
 
 Each subproject must be used from its own directory.
 
@@ -75,6 +80,28 @@ A notebook version of the quick test is also provided in
 `geo_params_web/notebooks/quick_test.ipynb` and can be executed from
 Visual Studio Code opened inside the `geo_params_web` directory.
 
+### User-parameter porosity test
+
+The `user_params_porosity` subproject provides a direct entry point for
+applying the collected user segmentation parameters to petrographic images.
+This is useful for reviewers or readers who want to reproduce porosity
+measurements without running the web data-collection app or the ML notebooks.
+
+From inside the `user_params_porosity` directory:
+
+```bash
+./install.sh
+pdm run python imports.py
+pdm run python measure_porosity_from_params.py \
+  "../ml_moldic_pores/data/thin_sections/*.jpg" \
+  --crop-metadata ../geo_params_web/static/imgs_sections/cuts/no-border/cut-metadata.json \
+  --output-dir data/output/public_thin_sections
+```
+
+This writes `porosity_summary.csv`, `porosity_by_parameter.csv`, and mean
+binarization masks to the selected output directory. The crop metadata is used
+to exclude image borders from the measurements.
+
 ## Data collection app
 
 The data collection application is located in the `geo_params_web` project folder.
@@ -107,6 +134,14 @@ The main Jupyter notebooks used in the associated paper are:
 - `pore-type-supervised-1.2.0.ipynb`
 - `pore-type-supervised-1.2.1-stats-json.ipynb`
 - `pore-type-supervised-1.2.2-visualizations.ipynb`
+
+## Applying User Parameters to New Images
+
+The `user_params_porosity` subproject is intended for post-collection
+porosity measurement. It consumes the anonymized parameter table exported by
+`geo_params_web` and applies those $(C_{\min}, K_{\max})$ thresholds to any
+set of input images. Optional crop metadata can be supplied as JSON to ensure
+that only valid central thin-section areas are measured.
 
 ## Related research
 
