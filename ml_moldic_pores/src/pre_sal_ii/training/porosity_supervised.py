@@ -269,8 +269,8 @@ if __name__ == "__main__":
 
     image_name_target = "72.53_jpeg_escal"
     path_target = f"../datasets/article_thin_sections/{image_name_target}.jpg"
-    scale_image_and_save(path_target, "out/thin_sections_4x/", 25)
-    path_target = f"out/thin_sections_4x/{image_name_target}_25.jpg"
+    scale_image_and_save(path_target, "out/thin_sections/", 25)
+    path_target = f"out/thin_sections/{image_name_target}_25.jpg"
     
     for gamma in np.arange(0.3, 0.71, 0.1):
         os.makedirs("models/varying_gamma/", exist_ok=True)
