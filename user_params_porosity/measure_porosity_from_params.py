@@ -5,7 +5,8 @@ This script applies the threshold-based parametrization to new images. The
 default summary reproduces the manuscript superposition procedure: masks with
 near-null detections are skipped, remaining masks are averaged, the mean mask is
 normalized by its top decile, and porosity is measured at fixed normalized
-thresholds.
+thresholds. A conservative sample-level guard prevents sparse false positives
+from being normalized into nonzero porosity estimates.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ import pandas as pd
 DEFAULT_THRESHOLDS = (0.05, 0.075, 0.10, 0.20, 0.30, 0.40)
 IMAGE_EXTENSIONS = ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff")
 DEFAULT_NULL_PORE_PIXEL_THRESHOLD = 1000
+DEFAULT_MIN_VALID_SAMPLE_FRACTION = 0.20
 
 
 def parse_args() -> argparse.Namespace:
@@ -72,6 +74,16 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Skip masks with fewer pore pixels than this value when building "
             "the manuscript superposition. Default: 1000."
+        ),
+    )
+    parser.add_argument(
+        "--min-valid-sample-fraction",
+        type=float,
+        default=DEFAULT_MIN_VALID_SAMPLE_FRACTION,
+        help=(
+            "Minimum fraction of all parameter masks that must pass "
+            "--null-pore-pixel-threshold before the image is treated as "
+            "containing detectable pores. Default: 0.20."
         ),
     )
     parser.add_argument(
@@ -237,6 +249,12 @@ def normalized_superposition_porosities(
     return porosities, normalizer
 
 
+def zero_superposition_porosities(
+    thresholds: list[float] | tuple[float, ...],
+) -> dict[str, float]:
+    return {threshold_column_name(threshold): 0.0 for threshold in thresholds}
+
+
 def clean_stem(path: Path) -> str:
     safe_chars = []
     for char in path.stem:
@@ -250,6 +268,7 @@ def measure_image(
     crop_metadata: dict[str, dict[str, int]],
     thresholds: list[float] | tuple[float, ...],
     null_pore_pixel_threshold: int = DEFAULT_NULL_PORE_PIXEL_THRESHOLD,
+    min_valid_sample_fraction: float = DEFAULT_MIN_VALID_SAMPLE_FRACTION,
     scale_label: str = "100%",
     scale_factor: float = 1.0,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], np.ndarray, np.ndarray]:
@@ -264,6 +283,8 @@ def measure_image(
 
     if scale_factor <= 0:
         raise ValueError(f"Scale factor must be positive for {image_path.name}.")
+    if not 0 <= min_valid_sample_fraction <= 1:
+        raise ValueError("Minimum valid sample fraction must be between 0 and 1.")
     if scale_factor != 1.0:
         image = cv2.resize(
             image,
@@ -333,10 +354,17 @@ def measure_image(
 
     porosities = [float(row["porosity"]) for row in per_param_rows]
     components = [int(row["component_count"]) for row in per_param_rows]
-    superposition_porosities, top_decile_normalizer = normalized_superposition_porosities(
-        superposition_mean_image,
-        thresholds,
-    )
+    valid_sample_fraction = valid_count / len(per_param_rows) if per_param_rows else 0.0
+    has_detectable_pores = valid_sample_fraction >= min_valid_sample_fraction
+    if has_detectable_pores:
+        superposition_porosities, top_decile_normalizer = normalized_superposition_porosities(
+            superposition_mean_image,
+            thresholds,
+        )
+    else:
+        superposition_mean_image[:] = 0
+        superposition_porosities = zero_superposition_porosities(thresholds)
+        top_decile_normalizer = 0.0
 
     summary: dict[str, Any] = {
         "image": image_path.name,
@@ -357,6 +385,9 @@ def measure_image(
         "crop_height": None if applied_crop is None else applied_crop["height"],
         "params_total": len(per_param_rows),
         "number_of_samples": valid_count,
+        "valid_sample_fraction": valid_sample_fraction,
+        "min_valid_sample_fraction": min_valid_sample_fraction,
+        "has_detectable_pores": has_detectable_pores,
         "null_pore_pixel_threshold": null_pore_pixel_threshold,
         "top_decile_normalizer": top_decile_normalizer,
         "porosity_mean_by_param": np.mean(porosities) if porosities else np.nan,
@@ -377,6 +408,7 @@ def run_analysis(
     output_dir: str | Path = "data/output/porosity_from_params",
     thresholds: list[float] | tuple[float, ...] = DEFAULT_THRESHOLDS,
     null_pore_pixel_threshold: int = DEFAULT_NULL_PORE_PIXEL_THRESHOLD,
+    min_valid_sample_fraction: float = DEFAULT_MIN_VALID_SAMPLE_FRACTION,
     scales: dict[str, float] | None = None,
     write_mean_images: bool = True,
     write_cropped_images: bool = False,
@@ -424,6 +456,7 @@ def run_analysis(
                 crop_metadata,
                 thresholds,
                 null_pore_pixel_threshold=null_pore_pixel_threshold,
+                min_valid_sample_fraction=min_valid_sample_fraction,
                 scale_label=scale_label,
                 scale_factor=scale_factor,
             )
@@ -468,6 +501,7 @@ def main() -> int:
         output_dir=args.output_dir,
         thresholds=args.thresholds,
         null_pore_pixel_threshold=args.null_pore_pixel_threshold,
+        min_valid_sample_fraction=args.min_valid_sample_fraction,
         write_mean_images=not args.no_mean_images,
         write_cropped_images=args.write_cropped_images,
         cropped_images_dir=args.cropped_images_dir,

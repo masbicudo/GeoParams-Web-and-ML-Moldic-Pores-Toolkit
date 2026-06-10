@@ -9,6 +9,12 @@ parameter masks are skipped, remaining masks are averaged, the mean mask is
 normalized by its top decile, and porosity is measured at fixed normalized
 thresholds. The manuscript table uses `porosity_20p`.
 
+To avoid amplifying sparse false positives in images with little or no
+blue-resin porosity, an image is only treated as containing detectable pores
+when at least 20% of parameter masks detect more than 1000 pore pixels. When
+that guard is not met, the normalized porosity columns are set to zero and
+`has_detectable_pores` is false.
+
 ## Setup
 
 Run commands from this directory:
