@@ -1,9 +1,11 @@
 """
 Measure porosity in new thin-section images using collected C/K parameters.
 
-This script applies the original threshold-based parametrization to new
-images. It does not collect new user data, filter out null detections, or train
-machine-learning models.
+This script applies the threshold-based parametrization to new images. The
+default summary reproduces the manuscript superposition procedure: masks with
+near-null detections are skipped, remaining masks are averaged, the mean mask is
+normalized by its top decile, and porosity is measured at fixed normalized
+thresholds.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ import pandas as pd
 
 DEFAULT_THRESHOLDS = (0.05, 0.075, 0.10, 0.20, 0.30, 0.40)
 IMAGE_EXTENSIONS = ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff")
+DEFAULT_NULL_PORE_PIXEL_THRESHOLD = 1000
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,7 +63,16 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         type=float,
         default=list(DEFAULT_THRESHOLDS),
-        help="Consensus thresholds for the mean mask, expressed from 0 to 1.",
+        help="Normalized superposition thresholds, expressed from 0 to 1.",
+    )
+    parser.add_argument(
+        "--null-pore-pixel-threshold",
+        type=int,
+        default=DEFAULT_NULL_PORE_PIXEL_THRESHOLD,
+        help=(
+            "Skip masks with fewer pore pixels than this value when building "
+            "the manuscript superposition. Default: 1000."
+        ),
     )
     parser.add_argument(
         "--no-mean-images",
@@ -71,6 +83,13 @@ def parse_args() -> argparse.Namespace:
         "--write-cropped-images",
         action="store_true",
         help="Write cropped input images used for measurement.",
+    )
+    parser.add_argument(
+        "--cropped-images-dir",
+        help=(
+            "Optional directory for cropped input images. Defaults to "
+            "<output-dir>/cropped_inputs when --write-cropped-images is used."
+        ),
     )
     return parser.parse_args()
 
@@ -188,6 +207,36 @@ def compute_components(binary_image: np.ndarray) -> int:
     return int(num_labels - 1)
 
 
+def threshold_column_name(threshold: float) -> str:
+    percent = threshold * 100
+    if float(percent).is_integer():
+        return f"porosity_{int(percent):02d}p"
+    integer_part = int(percent)
+    decimal_part = str(percent).split(".", maxsplit=1)[1].rstrip("0")
+    return f"porosity_{integer_part:02d}_{decimal_part}p"
+
+
+def normalized_superposition_porosities(
+    mean_image: np.ndarray,
+    thresholds: list[float] | tuple[float, ...],
+) -> tuple[dict[str, float], float]:
+    if mean_image.size == 0 or float(np.max(mean_image)) <= 0:
+        return {threshold_column_name(threshold): 0.0 for threshold in thresholds}, 0.0
+
+    top_decile_cutoff = np.percentile(mean_image, 90)
+    top_decile_pixels = mean_image[mean_image >= top_decile_cutoff]
+    normalizer = float(np.mean(top_decile_pixels))
+    if normalizer <= 0:
+        return {threshold_column_name(threshold): 0.0 for threshold in thresholds}, normalizer
+
+    normalized = mean_image / normalizer
+    porosities = {
+        threshold_column_name(threshold): float(np.mean(normalized >= threshold))
+        for threshold in thresholds
+    }
+    return porosities, normalizer
+
+
 def clean_stem(path: Path) -> str:
     safe_chars = []
     for char in path.stem:
@@ -199,6 +248,10 @@ def measure_image(
     image_path: Path,
     params_df: pd.DataFrame,
     crop_metadata: dict[str, dict[str, int]],
+    thresholds: list[float] | tuple[float, ...],
+    null_pore_pixel_threshold: int = DEFAULT_NULL_PORE_PIXEL_THRESHOLD,
+    scale_label: str = "100%",
+    scale_factor: float = 1.0,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], np.ndarray, np.ndarray]:
     image = cv2.imread(str(image_path))
     if image is None:
@@ -207,13 +260,27 @@ def measure_image(
     original_height, original_width = image.shape[:2]
     crop = find_crop_for_image(image_path, crop_metadata)
     image, applied_crop = crop_image(image, crop, image_path.name)
+    crop_height, crop_width = image.shape[:2]
+
+    if scale_factor <= 0:
+        raise ValueError(f"Scale factor must be positive for {image_path.name}.")
+    if scale_factor != 1.0:
+        image = cv2.resize(
+            image,
+            None,
+            fx=scale_factor,
+            fy=scale_factor,
+            interpolation=cv2.INTER_AREA,
+        )
 
     img_cmyk = bgr_to_cmyk(image)
     height, width = image.shape[:2]
     image_area = height * width
 
-    mean_image = np.zeros((height, width), dtype=np.float32)
+    raw_mean_image = np.zeros((height, width), dtype=np.float32)
+    superposition_mean_image = np.zeros((height, width), dtype=np.float32)
     per_param_rows: list[dict[str, Any]] = []
+    valid_count = 0
 
     for idx, row in params_df.iterrows():
         c_min = int(row["clicked_x"])
@@ -228,11 +295,14 @@ def measure_image(
         pore_pixels = int(np.count_nonzero(binary_image))
         porosity = pore_pixels / image_area if image_area else 0.0
         component_count = compute_components(binary_image)
+        valid_for_superposition = pore_pixels >= null_pore_pixel_threshold
 
         per_param_rows.append(
             {
                 "image": image_path.name,
                 "image_path": str(image_path),
+                "scale": scale_label,
+                "scale_factor": scale_factor,
                 "param_index": idx,
                 "source_param_image": row.get("filename"),
                 "experience": row.get("experience"),
@@ -242,6 +312,7 @@ def measure_image(
                 "pore_pixels": pore_pixels,
                 "porosity": porosity,
                 "component_count": component_count,
+                "valid_for_superposition": valid_for_superposition,
                 "crop_applied": applied_crop is not None,
                 "crop_x": None if applied_crop is None else applied_crop["x"],
                 "crop_y": None if applied_crop is None else applied_crop["y"],
@@ -250,19 +321,32 @@ def measure_image(
             }
         )
 
-        mean_image += binary_image
+        raw_mean_image += binary_image
+        if valid_for_superposition:
+            superposition_mean_image += binary_image
+            valid_count += 1
 
     if len(params_df) > 0:
-        mean_image /= len(params_df)
+        raw_mean_image /= len(params_df)
+    if valid_count > 0:
+        superposition_mean_image /= valid_count
 
     porosities = [float(row["porosity"]) for row in per_param_rows]
     components = [int(row["component_count"]) for row in per_param_rows]
+    superposition_porosities, top_decile_normalizer = normalized_superposition_porosities(
+        superposition_mean_image,
+        thresholds,
+    )
 
     summary: dict[str, Any] = {
         "image": image_path.name,
         "image_path": str(image_path),
+        "scale": scale_label,
+        "scale_factor": scale_factor,
         "original_height": original_height,
         "original_width": original_width,
+        "crop_source_height": crop_height,
+        "crop_source_width": crop_width,
         "height": height,
         "width": width,
         "area_pixels": image_area,
@@ -272,14 +356,18 @@ def measure_image(
         "crop_width": None if applied_crop is None else applied_crop["width"],
         "crop_height": None if applied_crop is None else applied_crop["height"],
         "params_total": len(per_param_rows),
+        "number_of_samples": valid_count,
+        "null_pore_pixel_threshold": null_pore_pixel_threshold,
+        "top_decile_normalizer": top_decile_normalizer,
         "porosity_mean_by_param": np.mean(porosities) if porosities else np.nan,
         "porosity_median_by_param": np.median(porosities) if porosities else np.nan,
         "porosity_std_by_param": np.std(porosities, ddof=1) if len(porosities) > 1 else np.nan,
         "component_count_mean_by_param": np.mean(components) if components else np.nan,
         "component_count_median_by_param": np.median(components) if components else np.nan,
     }
+    summary.update(superposition_porosities)
 
-    return summary, per_param_rows, mean_image, image
+    return summary, per_param_rows, superposition_mean_image, image
 
 
 def run_analysis(
@@ -288,12 +376,20 @@ def run_analysis(
     crop_metadata_path: str | Path | None = None,
     output_dir: str | Path = "data/output/porosity_from_params",
     thresholds: list[float] | tuple[float, ...] = DEFAULT_THRESHOLDS,
+    null_pore_pixel_threshold: int = DEFAULT_NULL_PORE_PIXEL_THRESHOLD,
+    scales: dict[str, float] | None = None,
     write_mean_images: bool = True,
     write_cropped_images: bool = False,
+    cropped_images_dir: str | Path | None = None,
 ) -> tuple[Path, Path]:
     params_path = Path(params_path)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    cropped_images_dir = (
+        output_dir / "cropped_inputs"
+        if cropped_images_dir is None
+        else Path(cropped_images_dir)
+    )
 
     if not params_path.exists():
         raise FileNotFoundError(friendly_missing_path_message(params_path, "Parameter CSV"))
@@ -317,29 +413,33 @@ def run_analysis(
 
     summary_rows: list[dict[str, Any]] = []
     all_per_param_rows: list[dict[str, Any]] = []
+    scales = {"100%": 1.0} if scales is None else scales
 
     for image_path in image_paths:
-        print(f"Processing {image_path}")
-        summary, per_param_rows, mean_image, measured_image = measure_image(
-            image_path,
-            params_df,
-            crop_metadata,
-        )
+        for scale_label, scale_factor in scales.items():
+            print(f"Processing {image_path} at {scale_label}")
+            summary, per_param_rows, mean_image, measured_image = measure_image(
+                image_path,
+                params_df,
+                crop_metadata,
+                thresholds,
+                null_pore_pixel_threshold=null_pore_pixel_threshold,
+                scale_label=scale_label,
+                scale_factor=scale_factor,
+            )
 
-        for threshold in thresholds:
-            key = f"porosity_consensus_{threshold:g}"
-            summary[key] = float(np.mean(mean_image >= threshold * 255))
+            summary_rows.append(summary)
+            all_per_param_rows.extend(per_param_rows)
 
-        summary_rows.append(summary)
-        all_per_param_rows.extend(per_param_rows)
+            suffix = f"{clean_stem(image_path)}_{scale_label.replace('%', 'pct').replace('.', '_')}"
+            if write_mean_images:
+                out_image = output_dir / f"superposition_mean_mask_{suffix}.png"
+                cv2.imwrite(str(out_image), mean_image.astype(np.uint8))
 
-        if write_mean_images:
-            out_image = output_dir / f"mean_mask_{clean_stem(image_path)}.png"
-            cv2.imwrite(str(out_image), mean_image.astype(np.uint8))
-
-        if write_cropped_images:
-            out_image = output_dir / f"cropped_input_{clean_stem(image_path)}.png"
-            cv2.imwrite(str(out_image), measured_image)
+            if write_cropped_images and scale_factor == 1.0:
+                cropped_images_dir.mkdir(parents=True, exist_ok=True)
+                out_image = cropped_images_dir / f"{clean_stem(image_path)}_cropped.png"
+                cv2.imwrite(str(out_image), measured_image)
 
     summary_df = pd.DataFrame(summary_rows)
     per_param_df = pd.DataFrame(all_per_param_rows)
@@ -353,6 +453,8 @@ def run_analysis(
     print(f"Wrote {per_param_file}")
     if write_mean_images:
         print(f"Wrote mean masks to {output_dir}")
+    if write_cropped_images:
+        print(f"Wrote cropped input images to {cropped_images_dir}")
 
     return summary_file, per_param_file
 
@@ -365,8 +467,10 @@ def main() -> int:
         crop_metadata_path=args.crop_metadata,
         output_dir=args.output_dir,
         thresholds=args.thresholds,
+        null_pore_pixel_threshold=args.null_pore_pixel_threshold,
         write_mean_images=not args.no_mean_images,
         write_cropped_images=args.write_cropped_images,
+        cropped_images_dir=args.cropped_images_dir,
     )
 
     return 0

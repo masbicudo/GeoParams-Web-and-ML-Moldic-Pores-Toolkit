@@ -69,7 +69,8 @@ def main() -> int:
     print(f"  image: {row['image']}")
     print(f"  crop applied: {row['crop_applied']}")
     print(f"  parameters applied: {int(row['params_total'])}")
-    print(f"  mean porosity: {100 * row['porosity_mean_by_param']:.2f}%")
+    print(f"  valid superposition samples: {int(row['number_of_samples'])}")
+    print(f"  manuscript porosity (porosity_20p): {100 * row['porosity_20p']:.2f}%")
     print(f"\nOutput written to: {OUTPUT_DIR}")
     print("Quick test completed successfully.")
     return 0

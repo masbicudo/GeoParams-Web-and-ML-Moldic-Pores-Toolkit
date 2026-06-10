@@ -4,6 +4,11 @@ This subproject applies previously collected user segmentation parameters to
 new petrographic images. It does not collect new user data and does not train
 machine-learning models.
 
+The default summaries use the manuscript superposition procedure: near-null
+parameter masks are skipped, remaining masks are averaged, the mean mask is
+normalized by its top decile, and porosity is measured at fixed normalized
+thresholds. The manuscript table uses `porosity_20p`.
+
 ## Setup
 
 Run commands from this directory:
@@ -45,6 +50,10 @@ Run the article thin sections:
 pdm run python run_article_thin_sections.py
 ```
 
+This also writes `data/output/article_thin_sections/article_porosity_table_20p.csv`,
+which is the compact image-based porosity table at `100%`, `50%`, `25%`, and
+`12.5%` resolution.
+
 Run the generalization-test thin sections:
 
 ```bash
@@ -55,6 +64,18 @@ Outputs are written under:
 
 ```text
 data/output/
+```
+
+To also export the cropped images used for measurement, run:
+
+```bash
+pdm run python run_generalization_test.py --write-cropped-images
+```
+
+The cropped images are written to:
+
+```text
+data/output/generalization_test_thin_sections/cropped_inputs/
 ```
 
 ## Crop Metadata Format
@@ -87,4 +108,7 @@ Outputs:
 
 - `porosity_summary.csv` - one row per image
 - `porosity_by_parameter.csv` - one row per image and user parameter pair
-- `mean_mask_*.png` - mean user-parameter binarization masks
+- `superposition_mean_mask_*.png` - mean user-parameter binarization masks
+
+The raw per-parameter columns remain in the CSV files for diagnostics, but
+`porosity_20p` is the article-compatible image-based porosity value.
