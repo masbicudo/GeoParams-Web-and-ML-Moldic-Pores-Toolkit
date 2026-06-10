@@ -31,6 +31,24 @@ def parse_args() -> argparse.Namespace:
             "data/output/generalization_test_thin_sections/cropped_inputs."
         ),
     )
+    parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=0,
+        help="Number of bootstrap replicates for uncertainty estimates. Default: 0.",
+    )
+    parser.add_argument(
+        "--bootstrap-seed",
+        type=int,
+        default=42,
+        help="Random seed used by bootstrap resampling. Default: 42.",
+    )
+    parser.add_argument(
+        "--bootstrap-chunk-pixels",
+        type=int,
+        default=250_000,
+        help="Pixels processed per bootstrap chunk. Default: 250000.",
+    )
     return parser.parse_args()
 
 
@@ -43,6 +61,9 @@ def main() -> int:
         crop_metadata_path=CROP_METADATA,
         output_dir=OUTPUT_DIR,
         write_cropped_images=args.write_cropped_images,
+        bootstrap_replicates=args.bootstrap,
+        bootstrap_seed=args.bootstrap_seed,
+        bootstrap_chunk_pixels=args.bootstrap_chunk_pixels,
     )
     return 0
 

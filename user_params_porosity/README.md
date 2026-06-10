@@ -72,6 +72,24 @@ Outputs are written under:
 data/output/
 ```
 
+For uncertainty estimates, add bootstrap resampling of the user parameters:
+
+```bash
+pdm run python run_article_thin_sections.py --bootstrap 200
+pdm run python run_generalization_test.py --bootstrap 200
+```
+
+For a quick smoke test of the bootstrap path, use a small number:
+
+```bash
+pdm run python run_generalization_test.py --bootstrap 5
+```
+
+Bootstrap outputs include standard deviation and 95% interval columns such as
+`porosity_20p_bootstrap_std`, `porosity_20p_bootstrap_p025`, and
+`porosity_20p_bootstrap_p975`. The bootstrap is processed in pixel chunks by
+default, so large full-image mask caches are not written to disk.
+
 To also export the cropped images used for measurement, run:
 
 ```bash

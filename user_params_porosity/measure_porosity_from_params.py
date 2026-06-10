@@ -12,8 +12,11 @@ from being normalized into nonzero porosity estimates.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import glob
 import json
+import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +29,7 @@ DEFAULT_THRESHOLDS = (0.05, 0.075, 0.10, 0.20, 0.30, 0.40)
 IMAGE_EXTENSIONS = ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff")
 DEFAULT_NULL_PORE_PIXEL_THRESHOLD = 1000
 DEFAULT_MIN_VALID_SAMPLE_FRACTION = 0.20
+DEFAULT_BOOTSTRAP_CHUNK_PIXELS = 250_000
 
 
 def parse_args() -> argparse.Namespace:
@@ -84,6 +88,30 @@ def parse_args() -> argparse.Namespace:
             "Minimum fraction of all parameter masks that must pass "
             "--null-pore-pixel-threshold before the image is treated as "
             "containing detectable pores. Default: 0.20."
+        ),
+    )
+    parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=0,
+        help=(
+            "Number of bootstrap replicates for uncertainty estimates. "
+            "Default: 0."
+        ),
+    )
+    parser.add_argument(
+        "--bootstrap-seed",
+        type=int,
+        default=42,
+        help="Random seed used by bootstrap resampling. Default: 42.",
+    )
+    parser.add_argument(
+        "--bootstrap-chunk-pixels",
+        type=int,
+        default=DEFAULT_BOOTSTRAP_CHUNK_PIXELS,
+        help=(
+            "Number of pixels processed per bootstrap chunk. Lower values "
+            "use less memory and more time. Default: 250000."
         ),
     )
     parser.add_argument(
@@ -219,6 +247,84 @@ def compute_components(binary_image: np.ndarray) -> int:
     return int(num_labels - 1)
 
 
+def available_memory_bytes() -> int | None:
+    if os.name == "nt":
+        class MemoryStatus(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        status = MemoryStatus()
+        status.dwLength = ctypes.sizeof(MemoryStatus)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return int(status.ullAvailPhys)
+        return None
+
+    if hasattr(os, "sysconf"):
+        try:
+            pages = os.sysconf("SC_AVPHYS_PAGES")
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            return int(pages * page_size)
+        except (OSError, ValueError):
+            return None
+    return None
+
+
+def format_bytes(size: float | int) -> str:
+    value = float(size)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if value < 1024 or unit == "TB":
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} TB"
+
+
+def print_bootstrap_resource_warning(
+    image_name: str,
+    area_pixels: int,
+    param_count: int,
+    bootstrap_replicates: int,
+    chunk_pixels: int,
+    output_dir: Path,
+) -> None:
+    if bootstrap_replicates <= 0:
+        return
+
+    chunk_pixels = max(1, min(chunk_pixels, area_pixels))
+    mask_chunk_bytes = param_count * chunk_pixels
+    replicate_chunk_bytes = bootstrap_replicates * chunk_pixels * np.dtype(np.uint16).itemsize
+    expected_chunk_bytes = mask_chunk_bytes + replicate_chunk_bytes
+    full_mask_cache_bytes = param_count * area_pixels
+    available_memory = available_memory_bytes()
+    free_disk = shutil.disk_usage(output_dir).free
+
+    print(
+        "Bootstrap resource estimate for "
+        f"{image_name}: chunk memory about {format_bytes(expected_chunk_bytes)}; "
+        f"a full mask cache would be about {format_bytes(full_mask_cache_bytes)}."
+    )
+    if available_memory is not None and expected_chunk_bytes > available_memory * 0.60:
+        print(
+            "  Warning: available RAM appears low for this chunk size "
+            f"({format_bytes(available_memory)} free). Reduce "
+            "--bootstrap-chunk-pixels if this run becomes slow or unstable."
+        )
+    if full_mask_cache_bytes > free_disk * 0.60:
+        print(
+            "  Note: a persistent full-image mask cache would not be a good "
+            f"default here ({format_bytes(free_disk)} free on the output disk), "
+            "so this script uses chunked in-memory masks."
+        )
+
+
 def threshold_column_name(threshold: float) -> str:
     percent = threshold * 100
     if float(percent).is_integer():
@@ -253,6 +359,162 @@ def zero_superposition_porosities(
     thresholds: list[float] | tuple[float, ...],
 ) -> dict[str, float]:
     return {threshold_column_name(threshold): 0.0 for threshold in thresholds}
+
+
+def porosities_from_count_histogram(
+    histogram: np.ndarray,
+    area_pixels: int,
+    thresholds: list[float] | tuple[float, ...],
+) -> dict[str, float]:
+    if area_pixels <= 0 or histogram.sum() == 0:
+        return zero_superposition_porosities(thresholds)
+
+    cumulative = np.cumsum(histogram)
+    top_decile_start = int(np.searchsorted(cumulative, area_pixels * 0.90, side="left"))
+    count_values = np.arange(histogram.size)
+    top_histogram = histogram[top_decile_start:]
+    top_counts = count_values[top_decile_start:]
+    top_pixels = int(top_histogram.sum())
+    if top_pixels <= 0:
+        return zero_superposition_porosities(thresholds)
+
+    top_mean = float(np.sum(top_counts * top_histogram) / top_pixels)
+    if top_mean <= 0:
+        return zero_superposition_porosities(thresholds)
+
+    porosities: dict[str, float] = {}
+    for threshold in thresholds:
+        min_count = int(np.ceil(threshold * top_mean))
+        min_count = max(0, min(min_count, histogram.size - 1))
+        porosities[threshold_column_name(threshold)] = float(
+            histogram[min_count:].sum() / area_pixels
+        )
+    return porosities
+
+
+def bootstrap_superposition_porosities(
+    measured_image: np.ndarray,
+    params_df: pd.DataFrame,
+    thresholds: list[float] | tuple[float, ...],
+    null_pore_pixel_threshold: int,
+    min_valid_sample_fraction: float,
+    bootstrap_replicates: int,
+    bootstrap_seed: int,
+    chunk_pixels: int,
+    image_name: str,
+    output_dir: Path,
+) -> dict[str, float]:
+    if bootstrap_replicates < 0:
+        raise ValueError("Bootstrap replicates must be zero or positive.")
+    if bootstrap_replicates == 0:
+        return {}
+    if chunk_pixels <= 0:
+        raise ValueError("Bootstrap chunk pixels must be positive.")
+
+    img_cmyk = bgr_to_cmyk(measured_image)
+    c_channel = img_cmyk[:, :, 0].reshape(-1)
+    y_channel = img_cmyk[:, :, 2].reshape(-1)
+    k_channel = img_cmyk[:, :, 3].reshape(-1)
+    area_pixels = int(c_channel.size)
+    param_count = len(params_df)
+    if area_pixels == 0 or param_count == 0:
+        return {}
+
+    print_bootstrap_resource_warning(
+        image_name,
+        area_pixels,
+        param_count,
+        bootstrap_replicates,
+        chunk_pixels,
+        output_dir,
+    )
+
+    c_mins = params_df["clicked_x"].astype(np.uint8).to_numpy()
+    k_maxs = params_df["clicked_y"].astype(np.uint8).to_numpy()
+    pore_pixel_counts = np.zeros(param_count, dtype=np.int64)
+
+    chunk_pixels = min(chunk_pixels, area_pixels)
+    for start in range(0, area_pixels, chunk_pixels):
+        end = min(start + chunk_pixels, area_pixels)
+        masks = (
+            (c_channel[start:end][None, :] >= c_mins[:, None])
+            & (y_channel[start:end][None, :] <= 64)
+            & (k_channel[start:end][None, :] <= k_maxs[:, None])
+        )
+        pore_pixel_counts += masks.sum(axis=1)
+
+    rng = np.random.default_rng(bootstrap_seed)
+    sample_indices = rng.integers(
+        0,
+        param_count,
+        size=(bootstrap_replicates, param_count),
+        endpoint=False,
+    )
+    sampled_valid = pore_pixel_counts[sample_indices] >= null_pore_pixel_threshold
+    valid_counts = sampled_valid.sum(axis=1)
+    valid_sample_fractions = valid_counts / param_count
+    has_detectable_pores = valid_sample_fractions >= min_valid_sample_fraction
+
+    max_valid_count = int(valid_counts.max(initial=0))
+    histograms = np.zeros((bootstrap_replicates, max_valid_count + 1), dtype=np.int64)
+    replicate_weights = np.zeros((bootstrap_replicates, param_count), dtype=np.uint16)
+    for replicate_index in range(bootstrap_replicates):
+        if not has_detectable_pores[replicate_index]:
+            continue
+        valid_indices = sample_indices[replicate_index, sampled_valid[replicate_index]]
+        replicate_weights[replicate_index] = np.bincount(
+            valid_indices,
+            minlength=param_count,
+        ).astype(np.uint16)
+
+    active_replicates = np.flatnonzero(has_detectable_pores)
+    for start in range(0, area_pixels, chunk_pixels):
+        end = min(start + chunk_pixels, area_pixels)
+        masks = (
+            (c_channel[start:end][None, :] >= c_mins[:, None])
+            & (y_channel[start:end][None, :] <= 64)
+            & (k_channel[start:end][None, :] <= k_maxs[:, None])
+        ).astype(np.uint16)
+
+        for replicate_index in active_replicates:
+            counts = replicate_weights[replicate_index] @ masks
+            histograms[replicate_index] += np.bincount(
+                counts,
+                minlength=max_valid_count + 1,
+            )
+
+    by_threshold: dict[str, list[float]] = {
+        threshold_column_name(threshold): []
+        for threshold in thresholds
+    }
+    for replicate_index in range(bootstrap_replicates):
+        if not has_detectable_pores[replicate_index]:
+            replicate_porosities = zero_superposition_porosities(thresholds)
+        else:
+            replicate_porosities = porosities_from_count_histogram(
+                histograms[replicate_index],
+                area_pixels,
+                thresholds,
+            )
+        for key, value in replicate_porosities.items():
+            by_threshold[key].append(value)
+
+    result: dict[str, float] = {
+        "bootstrap_replicates": bootstrap_replicates,
+        "bootstrap_seed": bootstrap_seed,
+        "bootstrap_valid_sample_fraction_mean": float(np.mean(valid_sample_fractions)),
+        "bootstrap_detectable_pore_fraction": float(np.mean(has_detectable_pores)),
+    }
+    for key, values in by_threshold.items():
+        values_array = np.array(values, dtype=np.float64)
+        result[f"{key}_bootstrap_mean"] = float(np.mean(values_array))
+        result[f"{key}_bootstrap_std"] = float(
+            np.std(values_array, ddof=1) if len(values_array) > 1 else 0.0
+        )
+        result[f"{key}_bootstrap_p025"] = float(np.quantile(values_array, 0.025))
+        result[f"{key}_bootstrap_p975"] = float(np.quantile(values_array, 0.975))
+
+    return result
 
 
 def clean_stem(path: Path) -> str:
@@ -409,6 +671,9 @@ def run_analysis(
     thresholds: list[float] | tuple[float, ...] = DEFAULT_THRESHOLDS,
     null_pore_pixel_threshold: int = DEFAULT_NULL_PORE_PIXEL_THRESHOLD,
     min_valid_sample_fraction: float = DEFAULT_MIN_VALID_SAMPLE_FRACTION,
+    bootstrap_replicates: int = 0,
+    bootstrap_seed: int = 42,
+    bootstrap_chunk_pixels: int = DEFAULT_BOOTSTRAP_CHUNK_PIXELS,
     scales: dict[str, float] | None = None,
     write_mean_images: bool = True,
     write_cropped_images: bool = False,
@@ -460,6 +725,20 @@ def run_analysis(
                 scale_label=scale_label,
                 scale_factor=scale_factor,
             )
+            summary.update(
+                bootstrap_superposition_porosities(
+                    measured_image,
+                    params_df,
+                    thresholds,
+                    null_pore_pixel_threshold,
+                    min_valid_sample_fraction,
+                    bootstrap_replicates,
+                    bootstrap_seed,
+                    bootstrap_chunk_pixels,
+                    f"{image_path.name} at {scale_label}",
+                    output_dir,
+                )
+            )
 
             summary_rows.append(summary)
             all_per_param_rows.extend(per_param_rows)
@@ -502,6 +781,9 @@ def main() -> int:
         thresholds=args.thresholds,
         null_pore_pixel_threshold=args.null_pore_pixel_threshold,
         min_valid_sample_fraction=args.min_valid_sample_fraction,
+        bootstrap_replicates=args.bootstrap,
+        bootstrap_seed=args.bootstrap_seed,
+        bootstrap_chunk_pixels=args.bootstrap_chunk_pixels,
         write_mean_images=not args.no_mean_images,
         write_cropped_images=args.write_cropped_images,
         cropped_images_dir=args.cropped_images_dir,

@@ -4,6 +4,7 @@ Run porosity measurements for the article thin sections using default paths.
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -35,6 +36,31 @@ SCALES = {
 }
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run manuscript porosity measurements for the article thin sections."
+    )
+    parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=0,
+        help="Number of bootstrap replicates for uncertainty estimates. Default: 0.",
+    )
+    parser.add_argument(
+        "--bootstrap-seed",
+        type=int,
+        default=42,
+        help="Random seed used by bootstrap resampling. Default: 42.",
+    )
+    parser.add_argument(
+        "--bootstrap-chunk-pixels",
+        type=int,
+        default=250_000,
+        help="Pixels processed per bootstrap chunk. Default: 250000.",
+    )
+    return parser.parse_args()
+
+
 def cropped_article_images() -> list[str]:
     with CROP_METADATA.open("r", encoding="utf-8") as fp:
         crop_data = json.load(fp)
@@ -42,6 +68,7 @@ def cropped_article_images() -> list[str]:
 
 
 def main() -> int:
+    args = parse_args()
     import_params()
     summary_file, _ = run_analysis(
         image_inputs=cropped_article_images(),
@@ -49,6 +76,9 @@ def main() -> int:
         crop_metadata_path=CROP_METADATA,
         output_dir=OUTPUT_DIR,
         scales=SCALES,
+        bootstrap_replicates=args.bootstrap,
+        bootstrap_seed=args.bootstrap_seed,
+        bootstrap_chunk_pixels=args.bootstrap_chunk_pixels,
     )
 
     summary_df = pd.read_csv(summary_file)
