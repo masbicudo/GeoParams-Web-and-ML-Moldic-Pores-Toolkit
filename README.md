@@ -8,7 +8,7 @@ This project analyzes how geologists parameterize and interpret petrographic thi
 - Python 3.12
 - NVIDIA CUDA driver ≥ 13.0 (required for GPU acceleration only in the
   `ml_moldic_pores` project folder; not needed for `geo_params_web`)
-- Visual Studio Code
+- Visual Studio Code (for running Jupyter notebooks; optional but recommended)
 
 The repository can be partially explored (quick test and data collection
 application) without GPU support.
@@ -123,6 +123,32 @@ exclude image borders from the measurements.
 ## Data collection app
 
 The data collection application is located in the `geo_params_web` project folder.
+
+### Docker (recommended)
+
+After placing the public images in `datasets/article_thin_sections/`, run:
+
+```bash
+cd geo_params_web
+./run.sh
+```
+
+The command builds the application image, prepares the local image cache, and
+starts the Flask data-collection app and Streamlit statistics app behind an
+Nginx reverse proxy:
+
+- Data collection: <http://localhost:8181/geo-server/>
+- Statistics: <http://localhost:8181/geo-server/stats/>
+
+The paths match the deployed application layout. Keep the terminal open while
+using the applications. Press `Ctrl+C` or close the terminal to stop the
+servers. Detailed startup diagnostics are written to
+`geo_params_web/log/docker-run.log`.
+
+Set `GEO_PARAMS_PORT` before running the command to use a different host port.
+For non-local deployments, also set a strong `FLASK_SECRET_KEY`.
+
+### Local development
 
 1. Open Visual Studio Code from the `geo_params_web` folder.
 2. Run `install.sh` to install the application requirements.

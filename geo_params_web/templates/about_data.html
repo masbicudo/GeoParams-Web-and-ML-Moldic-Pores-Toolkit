@@ -1,0 +1,35 @@
+{% extends "base_form.html" %}
+
+{% block title %}About data and anonymity{% endblock %}
+
+{% block content_1 %}
+  <h2>About data and anonymity</h2>
+
+  <p>
+    During the research experiment, participants interacted with petrographic
+    images by selecting segmentation parameters. Participants could request
+    anonymized participation during data collection.
+  </p>
+
+  <p>
+    The public release does not include participant names, email addresses,
+    free-text feedback, or any mapping between a person and their interactions.
+    The published data retain only the interaction records needed to reproduce
+    the analyses, such as selected parameter-space points and related image
+    measurements.
+  </p>
+
+  <p>
+    Random folder identifiers may still be used internally to organize related
+    files. They are technical storage identifiers and are not linked to
+    participant identities in the public release.
+  </p>
+
+  <p>
+    Researchers may use this software to conduct a new experiment with their
+    own participants. Any collection and handling of identifiable data in a
+    new study is the responsibility of that study's organizers.
+  </p>
+
+  <a href="{{ url_for('index') }}" class="btn btn-primary">Back to the application</a>
+{% endblock %}

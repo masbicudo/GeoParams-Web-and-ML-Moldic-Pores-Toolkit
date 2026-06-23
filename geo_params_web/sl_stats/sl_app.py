@@ -7,9 +7,9 @@ import libs.data as data
 import localizable_resources as lr
 import json
 
-# Set this to True to use local data
-# for testing without loading from
-# files that came from public repo.
+# The public release contains no participant identity mapping. Researchers
+# running a new local experiment may enable participant-level views for their
+# own data by changing this flag.
 ENABLE_PARTICIPANT_LEVEL_VIEWS = False
 
 st.set_page_config(
@@ -28,13 +28,6 @@ load_dotenv(".env", override=False)
 # Load data from the directory (replace with your directory path)
 df = data.load_data_from_files(debug=False, print=lambda x: st.text(x))
 
-if not ENABLE_PARTICIPANT_LEVEL_VIEWS:
-    st.info(
-        "Running in anonymized public-data mode. "
-        "Participant-level visualizations are disabled. "
-        "Toggle this by setting ENABLE_PARTICIPANT_LEVEL_VIEWS to True in sl_app.py."
-    )
-
 st.markdown("""
     <style>
         [data-testid="stSidebar"] {
@@ -45,6 +38,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.sidebar.header(lr.str.select_plot_type)
+st.sidebar.markdown("[About data and anonymity](/geo-server/about-data)")
 
 plot_type_options = {
         "params_c_k_segment_porosity": lr.str.best_color_params_plot_title,

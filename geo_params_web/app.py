@@ -299,6 +299,11 @@ def index(session_id):
                            )
 
 
+@app.route('/about-data')
+def about_data():
+    return render_template('about_data.html')
+
+
 @app.route('/user_id', methods=['GET'])
 @ensure_session
 def user_id(session_id):
