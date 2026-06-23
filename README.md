@@ -199,13 +199,15 @@ pdm run python run_generalization_test.py
 
 Outputs are written under `user_params_porosity/data/output/`.
 
-## Related research
+## Related publication
 
-This repository accompanies an unpublished research manuscript on the
-perception and parameterization of petrographic thin sections by geologists.
+This repository contains the software, notebooks, data, and reproducibility
+materials associated with:
 
-The code and notebooks provided here were used to generate figures,
-analyses, and results described in that manuscript.
+Bicudo, M., Tognoli, F., Menasché, D. S., Favoreto, J., and Borghi, L. (2026).
+“Through different lenses: Understanding how geologists perceive petrographic
+images.” *Computers & Geosciences*, 106222.
+[https://doi.org/10.1016/j.cageo.2026.106222](https://doi.org/10.1016/j.cageo.2026.106222)
 
 ## Contributing data
 
