@@ -3,18 +3,7 @@
 {% block title %}Interactive Image Hover{% endblock %}
 
 {% block content_1 %}
-  <div id="progress"></div>
-  <div id="hide-when-processing-done">
-    <p>This may take a few seconds before progress is displayed.</p>
-  </div>
-
-  <style>
-    .hidden {
-      display: none;
-    }
-  </style>
-
-  <div id="everything" class="hidden">
+  <div id="everything">
     <table class="image-table">
       <tr>
         <th>Parameter Space:</th>
@@ -105,11 +94,6 @@
       const filename = {{ filename | tojson }};
       const mmPerPixel = {{ mm_per_pixel | tojson }};
       const counter = {{ counter | tojson }};
-      const lr = { str: {
-        processing: "{{ lr.str.processing }}",
-        finished_processing: "{{ lr.str.finished_processing }}",
-        progress: "{{ lr.str.progress }}"
-      }};
     </script>
   </div>
 {% endblock %}

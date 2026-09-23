@@ -11,7 +11,16 @@ import matplotlib.pyplot as plt
 import io
 import os
 from libs import images
-from libs.web_helpers import ensure_session, expect_session, get_session, may_have_session, save_session, load_session
+from libs.web_helpers import (
+    create_session,
+    ensure_session,
+    expect_session,
+    get_session,
+    may_have_session,
+    restore_session,
+    save_session,
+    load_session,
+)
 from libs.web_helpers import setup_progress, progress_step, check_timeout
 import threading
 import json
@@ -40,7 +49,16 @@ from libs.porosity_jobs import (
     submit_porosity_job,
 )
 from libs.porosity_exports import build_results_csv
-from libs.job_registry import list_active_jobs, register_job_provider
+from libs.job_registry import list_active_workflows, register_job_provider
+from libs.parameter_collections import (
+    ParameterCollectionError,
+    create_parameter_collection,
+    get_parameter_collection,
+    list_parameter_collections,
+    load_collection_session,
+    save_collection_session,
+    update_parameter_collection,
+)
 
 register_job_provider(
     key='porosity',
@@ -48,6 +66,13 @@ register_job_provider(
     list_jobs=list_porosity_jobs,
     tool_endpoint='porosity_calculator',
     job_endpoint='porosity_job',
+)
+register_job_provider(
+    key='parameter-collection',
+    label='Parameter Collection',
+    list_jobs=list_parameter_collections,
+    tool_endpoint='parameter_collections',
+    job_endpoint='parameter_collection_page',
 )
 
 from dotenv import load_dotenv
@@ -65,6 +90,65 @@ IMAGE_SCALE = 12.5
 PARAMETERS_GRID = 32
 
 global_lock = threading.Lock()
+
+
+def _collection_for_session(session_id: str) -> tuple[dict, dict] | tuple[None, None]:
+    session = get_session(session_id)
+    if session is None:
+        return None, None
+    collection_id = session.get("parameter_collection_id")
+    if not collection_id:
+        return None, None
+    try:
+        return get_parameter_collection(collection_id), session
+    except ParameterCollectionError:
+        return None, None
+
+
+def _sync_collection(session_id: str, **values) -> dict | None:
+    collection, session = _collection_for_session(session_id)
+    if collection is None or session is None or collection.get("legacy"):
+        return None
+    return update_parameter_collection(
+        collection["id"],
+        session=session,
+        **values,
+    )
+
+
+def _restore_collection_session(collection: dict) -> dict:
+    session_id = collection["session_id"]
+    session = get_session(session_id)
+    if session is None:
+        session = load_collection_session(collection["id"])
+        restore_session(session_id, session)
+    return session
+
+
+def _collection_continue_url(collection: dict) -> str | None:
+    if collection.get("legacy") or collection.get("status") != "awaiting_input":
+        return None
+    endpoint = {
+        "user_information": "userinfo",
+        "image_selection": "image_select",
+        "parameter_selection": "params_select",
+    }.get(collection.get("stage"))
+    if endpoint is None:
+        return None
+    return url_for(endpoint, session_id=collection["session_id"])
+
+
+def _editable_collection_or_redirect(session_id: str):
+    collection, session = _collection_for_session(session_id)
+    if collection is None or session is None:
+        flash("Start or resume a parameter collection first.", "warning")
+        return None, None, redirect(url_for("parameter_collections"))
+    if collection.get("status") in {"done", "canceled", "error"}:
+        flash("This collection is read-only because its workflow has ended.", "warning")
+        return None, None, redirect(
+            url_for("parameter_collection_page", job_id=collection["id"])
+        )
+    return collection, session, None
 
 class ProcessToken:
     def __init__(self, state: str = "Idle"):
@@ -199,7 +283,22 @@ def task_executor(session_id: str, task_name: str,
                 log(session_id, f"Starting task thread {task_name} with {args_str}")
                 function_ref = globals()[task_name]
                 def task_thread_function():
-                    function_ref(session_id, count_timeouts)
+                    try:
+                        function_ref(session_id, count_timeouts)
+                    except Exception as exc:
+                        log(session_id, f"Task {task_name} failed: {exc}")
+                        with global_lock:
+                            set_task_error(task, "The automated processing step failed.")
+                        try:
+                            _sync_collection(
+                                session_id,
+                                status="error",
+                                stage="error",
+                                message="The automated processing step failed",
+                                error="The automated processing step failed.",
+                            )
+                        except ParameterCollectionError:
+                            pass
                 thread = threading.Thread(target=task_thread_function)
                 thread.start()
 
@@ -242,9 +341,31 @@ def initial_image_setup(session_id, count_timeouts: int = 0):
     os.makedirs(f"static/output/{session_id}/{session['counter']}", exist_ok=True)
 
     timeout = 10 if os.getenv('FLASK_ENV') != "development" else 60*60*24
-    set_total_steps = lambda steps: setup_progress(
-        session_id, "initial_image_setup", steps,
-        timeout=timeout)
+    last_collection_percent = -1
+    def report_collection_progress(message="Preparing parameter space"):
+        nonlocal last_collection_percent
+        progress = task.get("progress") or {}
+        total = max(1, int(progress.get("total_steps", 1)))
+        percent = min(99, round(100 * int(progress.get("step", 0)) / total))
+        if percent == last_collection_percent:
+            return
+        last_collection_percent = percent
+        _sync_collection(
+            session_id,
+            status="running",
+            stage="image_processing",
+            progress=percent,
+            message=message,
+            error=None,
+        )
+
+    def set_total_steps(steps):
+        setup_progress(
+            session_id, "initial_image_setup", steps,
+            timeout=timeout,
+        )
+        report_collection_progress()
+
     def do_step():
         if process_token.state == "Timeout":
             task_executor(session_id, "initial_image_setup",
@@ -253,6 +374,7 @@ def initial_image_setup(session_id, count_timeouts: int = 0):
             return False
         if process_token.state != "Running": return False
         progress_step(session_id, "initial_image_setup")
+        report_collection_progress()
         return True
     map_img, map_images = images.get_images(base_image,
                                             step=256//PARAMETERS_GRID,
@@ -294,6 +416,14 @@ def initial_image_setup(session_id, count_timeouts: int = 0):
 
     process_token.state = "Done"
     set_task_done(task, {"tile_shape": [tile_h, tile_w]})
+    _sync_collection(
+        session_id,
+        status="awaiting_input",
+        stage="parameter_selection",
+        progress=100,
+        message="Ready for parameter selection",
+        error=None,
+    )
 
 @app.context_processor
 def inject_endpoint():
@@ -330,7 +460,7 @@ def index(session_id):
                            session_id=session_id,
                            session=session,
                            user_name=user_name,
-                           active_job_count=len(list_active_jobs()),
+                           active_workflow_count=len(list_active_workflows()),
                            )
 
 
@@ -345,8 +475,65 @@ def jobs_overview():
     return render_template(
         'active_jobs.html',
         session_id=session_id,
-        jobs=list_active_jobs(),
+        jobs=list_active_workflows(),
     )
+
+
+@app.route('/parameter-collections')
+def parameter_collections():
+    return render_template(
+        'parameter_collections.html',
+        session_id=request.args.get('session_id'),
+        collections=list_parameter_collections(),
+    )
+
+
+@app.route('/parameter-collections/start', methods=['POST'])
+def parameter_collection_start():
+    session_id = create_session()
+    session = get_session(session_id)
+    if session is None:
+        raise RuntimeError("The collection session could not be created.")
+    create_parameter_collection(session_id, session["counter"], session)
+    return redirect(url_for('userinfo', session_id=session_id))
+
+
+@app.route('/parameter-collections/<job_id>')
+def parameter_collection_page(job_id):
+    try:
+        collection = get_parameter_collection(job_id)
+        if not collection.get("legacy") and collection.get("status") not in {
+            "done", "canceled", "error"
+        }:
+            _restore_collection_session(collection)
+    except ParameterCollectionError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('parameter_collections'))
+    return render_template(
+        'parameter_collection.html',
+        session_id=collection.get('session_id'),
+        collection=collection,
+        continue_url=_collection_continue_url(collection),
+    )
+
+
+@app.route('/parameter-collections/<job_id>/status')
+def parameter_collection_status(job_id):
+    try:
+        collection = get_parameter_collection(job_id)
+        if not collection.get("legacy") and collection.get("status") == "running":
+            session = _restore_collection_session(collection)
+            task = session.get("tasks", {}).get("initial_image_setup")
+            if task and task.get("state") == "Requested" and task.get("alive_tag") is None:
+                task_executor(collection["session_id"], "initial_image_setup", 0)
+                collection = get_parameter_collection(job_id)
+    except ParameterCollectionError as exc:
+        return jsonify({'status': 'error', 'error': str(exc)}), 404
+    response = dict(collection)
+    response.pop("session_id", None)
+    response.pop("counter", None)
+    response["continue_url"] = _collection_continue_url(collection)
+    return jsonify(response)
 
 
 @app.route('/porosity', methods=['GET', 'POST'])
@@ -509,9 +696,9 @@ def user_id(session_id):
 @app.route('/userinfo', methods=['GET', 'POST'])
 @ensure_session
 def userinfo(session_id):
-    session = get_session(session_id)
-    if session is None:
-        raise ValueError(f"Session {session_id} not found")
+    collection, session, response = _editable_collection_or_redirect(session_id)
+    if response is not None:
+        return response
     if request.method == 'GET':
         user = session.setdefault("options", {}).setdefault("user", {})
         experience = user.setdefault("experience", 0)
@@ -525,6 +712,13 @@ def userinfo(session_id):
             flash(lr.str.fill_all_fields, 'error')
             return redirect(url_for("userinfo",
                                     session_id=session_id))
+        _sync_collection(
+            session_id,
+            status="awaiting_input",
+            stage="image_selection",
+            progress=0,
+            message="Ready for image and region selection",
+        )
         return redirect(url_for("image_select",
                                 session_id=session_id))
 
@@ -535,9 +729,17 @@ def userinfo(session_id):
 @ensure_session
 def params_select(session_id):
     with log_function(session_id, "params_select", {}):
-        session = get_session(session_id)
-        if session is None:
-            raise ValueError(f"Session {session_id} not found")
+        collection, session, response = _editable_collection_or_redirect(session_id)
+        if response is not None:
+            return response
+        if collection.get("status") == "running":
+            return redirect(
+                url_for("parameter_collection_page", job_id=collection["id"])
+            )
+        if collection.get("stage") != "parameter_selection":
+            return redirect(
+                url_for("parameter_collection_page", job_id=collection["id"])
+            )
         session_min_pore_size = session.setdefault("options", {}).setdefault("initial_image_setup.min_pore_size", 480)
         tile_shape = session.setdefault("options", {}).get("initial_image_setup.tile_shape", [])
         points = session.setdefault("options", {}).setdefault("params_select.clicked_points", [])
@@ -560,59 +762,80 @@ def params_select(session_id):
             if "end_reason" in data:
                 end_reason = data["end_reason"]
                 log(session_id, f"end_reason = {end_reason}")
-                try:
-                    with global_lock:
-                        if end_reason == "cancel":
-                            state = "Cancel"
-                            log(session_id, f"steate = {state}")
-                            session["options"]["params_select.state"] = state
-                            return jsonify({"status": "canceled"}), 200
-                        elif end_reason == "done":
-                            errors = []
-                            
-                            log(session_id, f"1")
-                            # priority field
-                            priority = data.get("priority", "none")
-                            if priority in ["connectivity", "size", "shape"]:
-                                session["options"]["params_select.priority"] = priority
-                            else:
-                                errors.append(lr.str.priority_field_is_missing)
-                                
-                            log(session_id, f"2")
-                            # if any errors, return them
-                            if len(errors) > 0:
-                                state = "Error"
-                                log(session_id, f"steate = {state}")
-                                session["options"]["params_select.state"] = state
-                                flash("\n".join(errors), 'danger')
-                                return jsonify({"status": "error"}), 200
-                            
-                            log(session_id, f"3")
-                            # if everything is ok, return success
-                            flash(lr.str.data_saved, 'success')
-                            log(session_id, f"4")
-                            state = "Done"
-                            log(session_id, f"steate = {state}")
-                            session["options"]["params_select.state"] = state
-                            return jsonify({"status": "done"}), 200
-                        else:
-                            return jsonify({"error": "Unknown end reason"}), 400
-                finally:
-                    # Save the session options after processing the end reason
-                    data = session["options"]
-                    with open(f"static/output/{session_id}/{session['counter']}/options.json", "w") as f:
-                        json.dump(data, f, indent=2)
-                    state = session["options"]["params_select.state"]
-                    with open(f"static/output/{session_id}/{session['counter']}/params_select.state={state}", "w") as f:
-                        pass
+                if end_reason not in {"cancel", "done"}:
+                    return jsonify({"error": "Unknown end reason"}), 400
+
+                errors = []
+                state = "Cancel" if end_reason == "cancel" else "Done"
+                if end_reason == "done":
+                    priority = data.get("priority", "none")
+                    if priority in ["connectivity", "size", "shape"]:
+                        session["options"]["params_select.priority"] = priority
+                    else:
+                        errors.append(lr.str.priority_field_is_missing)
+                    if errors:
+                        state = "Error"
+                        flash("\n".join(errors), 'danger')
+
+                session["options"]["params_select.state"] = state
+                output_dir = f"static/output/{session_id}/{session['counter']}"
+                with open(f"{output_dir}/options.json", "w") as stream:
+                    json.dump(session["options"], stream, indent=2)
+                with open(f"{output_dir}/params_select.state={state}", "w"):
+                    pass
+
+                if state == "Done":
+                    flash(lr.str.data_saved, 'success')
+                    _sync_collection(
+                        session_id,
+                        status="done",
+                        stage="completed",
+                        progress=100,
+                        message="Collection complete",
+                        error=None,
+                    )
+                    return jsonify({"status": "done"}), 200
+                if state == "Cancel":
+                    _sync_collection(
+                        session_id,
+                        status="canceled",
+                        stage="canceled",
+                        progress=100,
+                        message="Collection discarded",
+                        error=None,
+                    )
+                    return jsonify({"status": "canceled"}), 200
+
+                _sync_collection(
+                    session_id,
+                    status="awaiting_input",
+                    stage="parameter_selection",
+                    progress=100,
+                    message="Ready for parameter selection",
+                )
+                return jsonify({"status": "error"}), 200
             
             min_pore_size = int(data.get('min_pore_size', 480))
             
             task_executor(session_id, "initial_image_setup",
                         0, [min_pore_size])
 
+            _sync_collection(
+                session_id,
+                status="running",
+                stage="image_processing",
+                progress=0,
+                message="Preparing parameter space",
+                error=None,
+            )
+
             print("Received min_pore_size:", min_pore_size)
-            return jsonify({'min_pore_size': min_pore_size})
+            return jsonify({
+                'min_pore_size': min_pore_size,
+                'redirect_url': url_for(
+                    'parameter_collection_page', job_id=collection['id']
+                ),
+            })
 
         # This should never be reached, but ensures all paths return
         return "Method not allowed", 405
@@ -624,11 +847,10 @@ def params_select(session_id):
 @app.route('/end_review', methods=['GET'])
 @ensure_session
 def end_review(session_id):
-    session = get_session(session_id)
-    if session is None:
-        raise ValueError(f"Session {session_id} not found")
-
-    return redirect(url_for("index", session_id=session_id, renew=True))
+    collection, session = _collection_for_session(session_id)
+    if collection is None or session is None:
+        return redirect(url_for("parameter_collections"))
+    return redirect(url_for("parameter_collection_page", job_id=collection["id"]))
 
 def getImageFiles():
     IMAGE_FILES_DIR = "static/imgs_sections"
@@ -780,10 +1002,10 @@ def custom_image_preview(dataset_id, image_id, session_id):
 @app.route('/image_select', methods=['GET', 'POST'])
 @ensure_session
 def image_select(session_id):
+    collection, session, response = _editable_collection_or_redirect(session_id)
+    if response is not None:
+        return response
     if request.method == 'GET':
-        session = get_session(session_id)
-        if session is None:
-            raise ValueError(f"Session {session_id} not found")
         options = session.setdefault("options", {})
         requested_dataset_id = request.args.get("dataset_id")
         current_dataset_id = requested_dataset_id or options.get(
@@ -804,6 +1026,13 @@ def image_select(session_id):
             images_available = builtin_image_choices()
             dataset_name = "Publication thin sections"
         options["image_select.dataset_id"] = current_dataset_id
+        _sync_collection(
+            session_id,
+            status="awaiting_input",
+            stage="image_selection",
+            progress=0,
+            message="Ready for image and region selection",
+        )
 
         if not images_available:
             return (
@@ -826,10 +1055,6 @@ def image_select(session_id):
                                area_h="0",
                                )
     elif request.method == 'POST':
-        session = get_session(session_id)
-        if session is None:
-            raise ValueError(f"Session {session_id} not found")
-        
         # deleting associated options
         session.get("options", {}).pop("initial_image_setup.min_pore_size", None)
         session.get("options", {}).pop("initial_image_setup.tile_shape", None)
@@ -886,8 +1111,18 @@ def image_select(session_id):
 
         task_executor(session_id, "initial_image_setup",
                       0, [480])
-        
-        return redirect(url_for("params_select", session_id=session_id))
+        _sync_collection(
+            session_id,
+            status="running",
+            stage="image_processing",
+            progress=0,
+            message="Preparing parameter space",
+            error=None,
+        )
+
+        return redirect(
+            url_for("parameter_collection_page", job_id=collection["id"])
+        )
 
     # This should never be reached, but ensures all paths return
     return "Method not allowed", 405
@@ -928,6 +1163,10 @@ def get_task_info(session_id, name):
 
     with log_function(session_id, "get_task_info", {"name": name}):
 
+        collection, _ = _collection_for_session(session_id)
+        if collection and collection.get("status") in {"done", "canceled", "error"}:
+            return jsonify({'error': 'This collection is read-only.'}), 409
+
         # If there is a task with the given name, ensure it is running
         task_executor(session_id, name, 0)
         
@@ -946,13 +1185,13 @@ def get_task_info(session_id, name):
 @app.route('/add_point', methods=['POST'])
 @expect_session
 def add_point(session_id):
+    collection, session, response = _editable_collection_or_redirect(session_id)
+    if response is not None:
+        return jsonify({"error": "This collection cannot be changed."}), 409
     data = request.get_json()
     x = int(data.get("x"))
     y = int(data.get("y"))
 
-    session = get_session(session_id)
-    if session is None:
-        raise ValueError(f"Session {session_id} not found")
     clicked_points = session.setdefault("options", {}).setdefault("params_select.clicked_points", [])
 
     # Prevent duplicates (optional)
@@ -971,26 +1210,28 @@ def add_point(session_id):
             "points": clicked_points
         }, f, indent=2)
 
+    save_collection_session(collection["id"], session)
+
     return jsonify({"status": "ok", "added": {"x": x, "y": y}})
 
 
 @app.route('/delete_point', methods=['POST'])
 @expect_session
 def delete_point(session_id):
+    collection, session, response = _editable_collection_or_redirect(session_id)
+    if response is not None:
+        return jsonify({"error": "This collection cannot be changed."}), 409
     data = request.get_json()
     x = int(data.get("x"))
     y = int(data.get("y"))
 
-    session = get_session(session_id)
-    if session is None:
-        raise ValueError(f"Session {session_id} not found")
     clicked_points = session.setdefault("options", {}).setdefault("params_select.clicked_points", [])
 
     # Check if point exists
     original_len = len(clicked_points)
     clicked_points = [pt for pt in clicked_points if not (pt["x"] == x and pt["y"] == y)]
     deleted = (len(clicked_points) < original_len)
-    session["clicked_points"] = clicked_points
+    session["options"]["params_select.clicked_points"] = clicked_points
 
     # Save updated list
     min_pore_size = session.get("options", {}).get("initial_image_setup.min_pore_size", 480)
@@ -1000,6 +1241,8 @@ def delete_point(session_id):
             "min_pore_size": min_pore_size,
             "points": clicked_points
         }, f, indent=2)
+
+    save_collection_session(collection["id"], session)
 
     if deleted:
         return jsonify({

@@ -81,12 +81,21 @@ def _atomic_json_write(path: Path, value: dict) -> None:
 
 def _session_snapshot(session: dict) -> dict:
     """Return restart-safe state without runtime-only thread objects."""
-    snapshot = deepcopy(session)
-    for task in snapshot.get("tasks", {}).values():
-        if not isinstance(task, dict):
+    snapshot = {}
+    for key, value in session.items():
+        if key != "tasks":
+            snapshot[key] = deepcopy(value)
             continue
-        task.pop("alive_tag", None)
-        task.pop("cache", None)
+        snapshot["tasks"] = {}
+        for task_name, task in value.items():
+            if not isinstance(task, dict):
+                continue
+            safe_task = {
+                task_key: deepcopy(task_value)
+                for task_key, task_value in task.items()
+                if task_key not in {"alive_tag", "cache"}
+            }
+            snapshot["tasks"][task_name] = safe_task
     return snapshot
 
 

@@ -171,6 +171,10 @@ body {
 .job-status-queued {
     color: #997404;
 }
+.job-status-input {
+    background: #ffc107;
+    color: #332701;
+}
 .job-status-error {
     background: #dc3545;
     color: white;

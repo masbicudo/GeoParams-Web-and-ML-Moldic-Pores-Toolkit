@@ -31,7 +31,7 @@
     <div>
       <h3 class="h5 mb-3">Tools</h3>
       <div class="d-grid gap-3">
-        <a href="{{ url_for('userinfo', session_id=session_id) }}"
+        <a href="{{ url_for('parameter_collections', session_id=session_id) }}"
           class="btn btn-primary py-3">
           <strong>{{lr.str.params_c_k_segment_porosity}}</strong><br>
           <small>Enter C/K segmentation parameters for thin-section images</small>
@@ -47,9 +47,9 @@
 
     <a href="{{ url_for('jobs_overview', session_id=session_id) }}"
       class="btn btn-light">
-      Active jobs
-      <span class="badge {{ 'text-bg-primary' if active_job_count else 'text-bg-secondary' }} ms-1">
-        {{ active_job_count }}
+      Active workflows
+      <span class="badge {{ 'text-bg-primary' if active_workflow_count else 'text-bg-secondary' }} ms-1">
+        {{ active_workflow_count }}
       </span>
     </a>
 

@@ -344,43 +344,8 @@ if (current_endpoint == "params_select")
         preview_img.style.imageRendering = "pixelated";  // optional
     }
     
-    function fetchTaskInfo(name) {
-        fetch("/get_task_info/" + name + "?session_id=" + sessionId)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    console.log("No task yet.");
-                    document.getElementById("progress").innerText =
-                        "Error processing! Go back and try again.";
-                    return;
-                }
-                var task = data.task;
-                if (task.state == "Done") {
-                    tile_shape = task.result.tile_shape
-                    document.getElementById("progress").innerText =
-                        lr.str.finished_processing;
-                    updateImages();
-                    document.getElementById("everything").classList.remove("hidden");
-                    document.getElementById("hide-when-processing-done").classList.add("hidden");
-                }
-                if (task.state == "Requested") {
-                    document.getElementById("everything").classList.remove("hidden");
-                    document.getElementById("hide-when-processing-done").classList.add("hidden");
-                    if (task.progress) {
-                        const p = task.progress.step/task.progress.total_steps;
-                        document.getElementById("progress").innerText =
-                            lr.str.progress.replace("{p}", (p * 100).toFixed(0));
-                    } else {
-                        document.getElementById("progress").innerText =
-                            lr.str.processing;
-                    }
-                    setTimeout(() => fetchTaskInfo(name), 1000);
-                }
-            });
-    }
-    
     document.addEventListener("DOMContentLoaded", function () {
-        fetchTaskInfo("initial_image_setup");
+        updateImages();
         setSliderLabel();
     });
 
@@ -408,7 +373,9 @@ if (current_endpoint == "params_select")
         })
         .then(response => response.json())
         .then(data => {
-            fetchTaskInfo("initial_image_setup");
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+            }
         });
     }
 

@@ -1,0 +1,44 @@
+{% set summary = collection.summary %}
+<h3 class="h5">Technical summary</h3>
+<p class="small text-muted">
+  Personal identifiers, dataset names, and image filenames are intentionally
+  not displayed on this page.
+</p>
+<dl class="row">
+  <dt class="col-sm-5">Source type</dt>
+  <dd class="col-sm-7">{{ summary.source_kind }}</dd>
+
+  <dt class="col-sm-5">Selected parameter pairs</dt>
+  <dd class="col-sm-7">{{ summary.parameter_count }}</dd>
+
+  <dt class="col-sm-5">Minimum pore area</dt>
+  <dd class="col-sm-7">
+    {% if summary.minimum_pore_area_px is not none %}
+      {{ summary.minimum_pore_area_px }} px²
+    {% else %}
+      <span class="text-muted">Not recorded</span>
+    {% endif %}
+  </dd>
+
+  <dt class="col-sm-5">Selection priority</dt>
+  <dd class="col-sm-7">{{ summary.priority or 'Not recorded' }}</dd>
+
+  <dt class="col-sm-5">Physical calibration</dt>
+  <dd class="col-sm-7">{{ 'Available' if summary.has_physical_scale else 'Not recorded' }}</dd>
+</dl>
+
+{% if summary.parameters %}
+<h4 class="h6">Collected C/K thresholds</h4>
+<div class="table-responsive">
+  <table class="table table-sm">
+    <thead>
+      <tr><th>Cyan minimum</th><th>Black maximum</th></tr>
+    </thead>
+    <tbody>
+      {% for point in summary.parameters %}
+      <tr><td>{{ point.cyan_min }}</td><td>{{ point.black_max }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

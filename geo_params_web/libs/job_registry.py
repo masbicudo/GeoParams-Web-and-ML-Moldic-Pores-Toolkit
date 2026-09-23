@@ -28,6 +28,12 @@ def register_job_provider(
         }
 
 
+def unregister_job_provider(key: str) -> None:
+    """Remove a provider, primarily for isolated application tests."""
+    with _providers_lock:
+        _providers.pop(key, None)
+
+
 def list_active_jobs() -> list[dict]:
     """Return nonterminal workflows using a tool-neutral presentation schema."""
     with _providers_lock:

@@ -3,12 +3,25 @@ from __future__ import annotations
 import unittest
 import uuid
 
-from libs.job_registry import list_active_jobs, list_active_workflows, register_job_provider
+from libs.job_registry import (
+    list_active_jobs,
+    list_active_workflows,
+    register_job_provider,
+    unregister_job_provider,
+)
 
 
 class JobRegistryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.provider_keys = []
+
+    def tearDown(self) -> None:
+        for key in self.provider_keys:
+            unregister_job_provider(key)
+
     def test_only_exposes_active_jobs_with_tool_origin(self) -> None:
         key = f"test-{uuid.uuid4().hex}"
+        self.provider_keys.append(key)
         register_job_provider(
             key=key,
             label="Example Tool",
@@ -39,6 +52,7 @@ class JobRegistryTests(unittest.TestCase):
 
     def test_human_input_workflow_is_active_without_being_a_compute_job(self) -> None:
         key = f"test-{uuid.uuid4().hex}"
+        self.provider_keys.append(key)
         register_job_provider(
             key=key,
             label="Parameter Collection",

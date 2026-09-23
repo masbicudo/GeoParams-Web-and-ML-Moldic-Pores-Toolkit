@@ -1,0 +1,99 @@
+{% extends "base_form.html" %}
+
+{% block title %}Parameter collections{% endblock %}
+
+{% block content_1 %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <h2>Parameter collections</h2>
+    <p class="text-muted mb-0">
+      Each item represents the complete collection flow, including automated
+      preparation and the decisions requested from the user.
+    </p>
+  </div>
+  <a class="btn btn-outline-secondary"
+     href="{{ url_for('index', session_id=session_id) }}">Home</a>
+</div>
+
+<div class="alert alert-light border" role="note">
+  This list deliberately omits participant names, contact details, dataset
+  names, and image filenames. Technical source data remain stored only where
+  the collection needs them.
+</div>
+
+<form method="POST" action="{{ url_for('parameter_collection_start') }}" class="mb-4">
+  <button class="btn btn-primary" type="submit">Start a collection now</button>
+</form>
+
+<div class="d-flex justify-content-between align-items-center gap-3 mb-2">
+  <h3 class="h5 mb-0">Collections</h3>
+  <a class="btn btn-sm btn-outline-secondary"
+     href="{{ url_for('parameter_collections', session_id=session_id) }}">Refresh statuses</a>
+</div>
+
+{% if collections %}
+<div class="table-responsive">
+  <table class="table table-sm align-middle porosity-jobs-table">
+    <thead>
+      <tr>
+        <th scope="col">Status</th>
+        <th scope="col">Collection</th>
+        <th scope="col">Current stage</th>
+        <th scope="col"><span class="visually-hidden">Open</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in collections %}
+      <tr>
+        <td class="text-nowrap">
+          {% if item.status == 'done' %}
+            <span class="job-status-icon job-status-done" aria-hidden="true">✓</span>
+            <span class="small">Completed</span>
+          {% elif item.status == 'running' %}
+            <span class="job-status-icon job-status-running" aria-hidden="true">●</span>
+            <span class="small">Processing {{ item.progress }}%</span>
+          {% elif item.status == 'awaiting_input' %}
+            <span class="job-status-icon job-status-input" aria-hidden="true">✎</span>
+            <span class="small">Input needed</span>
+          {% elif item.status == 'canceled' %}
+            <span class="job-status-icon job-status-queued" aria-hidden="true">—</span>
+            <span class="small">Discarded</span>
+          {% else %}
+            <span class="job-status-icon job-status-error" aria-hidden="true">!</span>
+            <span class="small">Failed</span>
+          {% endif %}
+        </td>
+        <td>
+          <strong class="font-monospace">{{ item.short_id }}…</strong>
+          {% if item.created_at %}
+          <br><span class="small text-muted">
+            {{ item.created_at[:19] | replace('T', ' ') }} UTC
+          </span>
+          {% endif %}
+          {% if item.legacy %}
+            <span class="badge text-bg-light">earlier collection</span>
+          {% endif %}
+        </td>
+        <td>
+          {{ item.detail }}
+          {% if item.status == 'running' %}
+            <div class="progress mt-1" style="height: 0.4rem;" aria-hidden="true">
+              <div class="progress-bar" style="width: {{ item.progress }}%"></div>
+            </div>
+          {% endif %}
+        </td>
+        <td class="text-end">
+          <a class="btn btn-sm btn-outline-primary"
+             href="{{ url_for('parameter_collection_page', job_id=item.id) }}">
+            {% if item.status == 'done' or item.status == 'canceled' %}Summary{% elif item.status == 'running' %}Progress{% else %}Continue{% endif %}
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-muted">No parameter collections have been recorded yet.</p>
+{% endif %}
+{% endblock %}
