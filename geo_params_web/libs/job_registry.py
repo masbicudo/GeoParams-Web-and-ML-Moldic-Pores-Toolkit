@@ -1,4 +1,4 @@
-"""Registry that presents active jobs from independent application tools."""
+"""Registry that presents active workflows from independent application tools."""
 
 from __future__ import annotations
 
@@ -29,14 +29,14 @@ def register_job_provider(
 
 
 def list_active_jobs() -> list[dict]:
-    """Return queued/running jobs using a tool-neutral presentation schema."""
+    """Return nonterminal workflows using a tool-neutral presentation schema."""
     with _providers_lock:
         providers = list(_providers.values())
 
     active: list[dict] = []
     for provider in providers:
         for job in provider["list_jobs"]():
-            if job.get("status") not in {"queued", "running"}:
+            if job.get("status") not in {"queued", "running", "awaiting_input"}:
                 continue
             active.append(
                 {
@@ -45,8 +45,10 @@ def list_active_jobs() -> list[dict]:
                     "status": job["status"],
                     "progress": job.get("progress", 0),
                     "message": job.get("message", ""),
-                    "title": job.get("original_filename", f"Job {job['id'][:12]}"),
-                    "detail": job.get("dataset_name", ""),
+                    "title": job.get("title") or job.get(
+                        "original_filename", f"Workflow {job['id'][:12]}"
+                    ),
+                    "detail": job.get("detail") or job.get("dataset_name", ""),
                     "created_at": job.get("created_at"),
                     "tool_key": provider["key"],
                     "tool_name": provider["label"],
@@ -58,3 +60,8 @@ def list_active_jobs() -> list[dict]:
         active,
         key=lambda item: item.get("created_at") or "",
     )
+
+
+def list_active_workflows() -> list[dict]:
+    """Preferred terminology for the global nonterminal item list."""
+    return list_active_jobs()

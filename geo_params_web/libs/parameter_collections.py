@@ -19,6 +19,16 @@ COLLECTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 ACTIVE_STATUSES = {"awaiting_input", "running"}
 TERMINAL_STATUSES = {"done", "canceled", "error"}
 
+STAGE_LABELS = {
+    "user_information": "Ready for background information",
+    "image_selection": "Ready for image and region selection",
+    "image_processing": "Preparing the parameter space",
+    "parameter_selection": "Ready for parameter selection",
+    "completed": "Collection complete",
+    "canceled": "Collection discarded",
+    "error": "Processing failed",
+}
+
 _lock = threading.RLock()
 
 
@@ -129,6 +139,7 @@ def _read_record(collection_id: str) -> dict | None:
 
 def create_parameter_collection(session_id: str, counter: int, session: dict) -> dict:
     collection_id = uuid.uuid4().hex
+    session["parameter_collection_id"] = collection_id
     now = _utc_now()
     record = {
         "version": 1,
@@ -252,6 +263,8 @@ def _decorate(record: dict) -> dict:
     public = dict(record)
     public["short_id"] = record["id"][:12]
     public["legacy"] = bool(record.get("legacy", False))
+    public["title"] = f"Collection {public['short_id']}"
+    public["detail"] = STAGE_LABELS.get(record.get("stage"), record.get("message", ""))
     if "summary" not in public:
         try:
             state = load_collection_session(record["id"])
@@ -289,4 +302,3 @@ def get_parameter_collection(collection_id: str) -> dict:
         if legacy["id"] == collection_id:
             return legacy
     raise ParameterCollectionError("Parameter collection not found.")
-

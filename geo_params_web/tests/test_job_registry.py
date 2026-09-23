@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 import uuid
 
-from libs.job_registry import list_active_jobs, register_job_provider
+from libs.job_registry import list_active_jobs, list_active_workflows, register_job_provider
 
 
 class JobRegistryTests(unittest.TestCase):
@@ -36,6 +36,30 @@ class JobRegistryTests(unittest.TestCase):
         self.assertEqual(jobs[0]["tool_name"], "Example Tool")
         self.assertEqual(jobs[0]["title"], "sample.png")
         self.assertEqual(jobs[0]["status"], "queued")
+
+    def test_human_input_workflow_is_active_without_being_a_compute_job(self) -> None:
+        key = f"test-{uuid.uuid4().hex}"
+        register_job_provider(
+            key=key,
+            label="Parameter Collection",
+            list_jobs=lambda: [
+                {
+                    "id": "c" * 32,
+                    "status": "awaiting_input",
+                    "progress": 100,
+                    "message": "Ready for parameter selection",
+                    "title": "Collection cccccccccccc",
+                    "detail": "Ready for parameter selection",
+                }
+            ],
+            tool_endpoint="collection_tool",
+            job_endpoint="collection_item",
+        )
+
+        workflows = [item for item in list_active_workflows() if item["tool_key"] == key]
+        self.assertEqual(len(workflows), 1)
+        self.assertEqual(workflows[0]["status"], "awaiting_input")
+        self.assertEqual(workflows[0]["title"], "Collection cccccccccccc")
 
 
 if __name__ == "__main__":
