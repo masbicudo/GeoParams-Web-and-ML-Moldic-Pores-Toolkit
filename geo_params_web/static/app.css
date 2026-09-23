@@ -110,3 +110,7 @@ body {
     border: 1px solid #ced4da;
     background: #111;
 }
+.porosity-progress {
+    height: 2rem;
+    font-size: 1rem;
+}

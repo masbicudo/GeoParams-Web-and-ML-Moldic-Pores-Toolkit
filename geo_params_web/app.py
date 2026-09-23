@@ -28,11 +28,11 @@ from libs.upload_datasets import (
 )
 from libs.porosity_tool import (
     PorosityToolError,
-    analyze_upload,
     load_result,
     parameter_sets,
     result_image_path,
 )
+from libs.porosity_jobs import get_porosity_job, submit_porosity_job
 
 from dotenv import load_dotenv
 load_dotenv(".env", override=False)
@@ -334,7 +334,7 @@ def porosity_calculator():
         )
 
     try:
-        result = analyze_upload(
+        job = submit_porosity_job(
             request.form.get('dataset_id', ''),
             request.files.get('image'),
             bootstrap=request.form.get('bootstrap') == 'yes',
@@ -343,9 +343,37 @@ def porosity_calculator():
         flash(str(exc), 'danger')
         return redirect(url_for('porosity_calculator', session_id=session_id))
 
-    return redirect(
-        url_for('porosity_result', run_id=result['id'], session_id=session_id)
+    return redirect(url_for('porosity_job', job_id=job['id'], session_id=session_id))
+
+
+@app.route('/porosity/jobs/<job_id>')
+def porosity_job(job_id):
+    session_id = request.args.get('session_id')
+    try:
+        job = get_porosity_job(job_id)
+    except PorosityToolError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('porosity_calculator', session_id=session_id))
+    return render_template(
+        'porosity_progress.html',
+        session_id=session_id,
+        job=job,
     )
+
+
+@app.route('/porosity/jobs/<job_id>/status')
+def porosity_job_status(job_id):
+    try:
+        job = get_porosity_job(job_id)
+    except PorosityToolError as exc:
+        return jsonify({'status': 'error', 'error': str(exc)}), 404
+    if job['status'] == 'done':
+        job['result_url'] = url_for(
+            'porosity_result',
+            run_id=job['result_id'],
+            session_id=request.args.get('session_id'),
+        )
+    return jsonify(job)
 
 
 @app.route('/porosity/results/<run_id>')

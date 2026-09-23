@@ -1,0 +1,85 @@
+{% extends "base_form.html" %}
+
+{% block title %}Calculating porosity{% endblock %}
+
+{% block content_1 %}
+<h2>Calculating porosity</h2>
+<p class="text-muted">
+  The analysis continues on the server while this page reports its actual progress.
+</p>
+
+<div id="job-progress-panel" aria-live="polite">
+  <div class="progress porosity-progress mb-3" role="progressbar"
+       aria-label="Porosity calculation progress"
+       aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ job.progress }}">
+    <div id="job-progress-bar"
+         class="progress-bar progress-bar-striped progress-bar-animated"
+         style="width: {{ job.progress }}%">
+      <span id="job-progress-percent">{{ job.progress }}%</span>
+    </div>
+  </div>
+  <p id="job-progress-message" class="mb-1">{{ job.message }}</p>
+  <p id="job-progress-detail" class="small text-muted">
+    {% if job.bootstrap %}
+      Bootstrap confidence interval requested. This stage can take several minutes.
+    {% else %}
+      Applying the collected parameter masks to the uploaded image.
+    {% endif %}
+  </p>
+</div>
+
+<div id="job-error" class="alert alert-danger d-none" role="alert"></div>
+
+<script>
+(() => {
+  const statusUrl = {{ url_for('porosity_job_status', job_id=job.id, session_id=session_id) | tojson }};
+  const bar = document.getElementById('job-progress-bar');
+  const percent = document.getElementById('job-progress-percent');
+  const message = document.getElementById('job-progress-message');
+  const detail = document.getElementById('job-progress-detail');
+  const errorBox = document.getElementById('job-error');
+  const progress = document.querySelector('[role="progressbar"]');
+  let stopped = false;
+
+  function showError(text) {
+    stopped = true;
+    bar.classList.remove('progress-bar-animated');
+    errorBox.textContent = text;
+    errorBox.classList.remove('d-none');
+    detail.textContent = 'Return to the calculator and try again.';
+  }
+
+  async function updateProgress() {
+    if (stopped) return;
+    try {
+      const response = await fetch(statusUrl, {cache: 'no-store'});
+      const job = await response.json();
+      if (!response.ok || job.status === 'error') {
+        showError(job.error || 'The analysis stopped unexpectedly.');
+        return;
+      }
+
+      const value = Math.max(0, Math.min(100, Number(job.progress) || 0));
+      bar.style.width = `${value}%`;
+      percent.textContent = `${value}%`;
+      message.textContent = job.message || 'Working';
+      progress.setAttribute('aria-valuenow', String(value));
+
+      if (job.status === 'done') {
+        stopped = true;
+        bar.classList.remove('progress-bar-animated');
+        detail.textContent = 'Opening the result…';
+        window.location.replace(job.result_url);
+        return;
+      }
+      window.setTimeout(updateProgress, 750);
+    } catch (error) {
+      message.textContent = 'Connection interrupted; trying again…';
+      window.setTimeout(updateProgress, 1500);
+    }
+  }
+
+  updateProgress();
+})();
+</script>
+{% endblock %}
