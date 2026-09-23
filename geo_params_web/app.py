@@ -32,7 +32,14 @@ from libs.porosity_tool import (
     parameter_sets,
     result_image_path,
 )
-from libs.porosity_jobs import get_porosity_job, submit_porosity_job
+from libs.porosity_jobs import (
+    delete_porosity_jobs,
+    get_porosity_job,
+    list_porosity_jobs,
+    recalculate_porosity_job,
+    submit_porosity_job,
+)
+from libs.porosity_exports import build_results_csv
 
 from dotenv import load_dotenv
 load_dotenv(".env", override=False)
@@ -330,6 +337,7 @@ def porosity_calculator():
             'porosity.html',
             session_id=session_id,
             parameter_sets=parameter_sets(),
+            jobs=list_porosity_jobs(),
             result=None,
         )
 
@@ -343,6 +351,15 @@ def porosity_calculator():
         flash(str(exc), 'danger')
         return redirect(url_for('porosity_calculator', session_id=session_id))
 
+    if job.get('duplicate'):
+        return redirect(
+            url_for(
+                'porosity_existing_job',
+                job_id=job['id'],
+                bootstrap='1' if job.get('requested_bootstrap') else '0',
+                session_id=session_id,
+            )
+        )
     return redirect(url_for('porosity_job', job_id=job['id'], session_id=session_id))
 
 
@@ -370,6 +387,65 @@ def porosity_job_status(job_id):
     return jsonify(job)
 
 
+@app.route('/porosity/jobs/<job_id>/existing')
+def porosity_existing_job(job_id):
+    session_id = request.args.get('session_id')
+    try:
+        job = get_porosity_job(job_id)
+    except PorosityToolError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('porosity_calculator', session_id=session_id))
+    return render_template(
+        'porosity_duplicate.html',
+        session_id=session_id,
+        job=job,
+        requested_bootstrap=request.args.get('bootstrap') == '1',
+    )
+
+
+@app.route('/porosity/jobs/<job_id>/recalculate', methods=['POST'])
+def porosity_job_recalculate(job_id):
+    session_id = request.args.get('session_id')
+    try:
+        job = recalculate_porosity_job(
+            job_id,
+            bootstrap=request.form.get('bootstrap') == 'yes',
+        )
+    except PorosityToolError as exc:
+        flash(str(exc), 'danger')
+        return redirect(
+            url_for('porosity_existing_job', job_id=job_id, session_id=session_id)
+        )
+    return redirect(url_for('porosity_job', job_id=job['id'], session_id=session_id))
+
+
+@app.route('/porosity/jobs/delete', methods=['POST'])
+def porosity_jobs_delete():
+    session_id = request.args.get('session_id')
+    try:
+        deleted = delete_porosity_jobs(request.form.getlist('job_ids'))
+        flash(f"Deleted {deleted} saved analysis item(s).", 'success')
+    except PorosityToolError as exc:
+        flash(str(exc), 'danger')
+    return redirect(url_for('porosity_calculator', session_id=session_id))
+
+
+@app.route('/porosity/jobs/export', methods=['POST'])
+def porosity_jobs_export():
+    session_id = request.args.get('session_id')
+    try:
+        csv_text = build_results_csv(request.form.getlist('job_ids'))
+    except PorosityToolError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('porosity_calculator', session_id=session_id))
+    response = make_response(csv_text)
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = (
+        'attachment; filename="porosity-results.csv"'
+    )
+    return response
+
+
 @app.route('/porosity/results/<run_id>')
 def porosity_result(run_id):
     session_id = request.args.get('session_id')
@@ -382,6 +458,7 @@ def porosity_result(run_id):
         'porosity.html',
         session_id=session_id,
         parameter_sets=parameter_sets(),
+        jobs=list_porosity_jobs(),
         result=result,
     )
 

@@ -1,0 +1,58 @@
+{% extends "base_form.html" %}
+
+{% block title %}Existing porosity analysis{% endblock %}
+
+{% block content_1 %}
+<h2>Analysis already exists</h2>
+<p>
+  <strong>{{ job.original_filename }}</strong> has already been submitted with
+  the <strong>{{ job.dataset_name }}</strong> parameter dataset.
+</p>
+
+<dl class="row small">
+  <dt class="col-sm-4">Analysis hash</dt>
+  <dd class="col-sm-8 font-monospace">{{ job.id }}</dd>
+  <dt class="col-sm-4">Status</dt>
+  <dd class="col-sm-8">{{ job.status | capitalize }} — {{ job.message }}</dd>
+  <dt class="col-sm-4">Bootstrap</dt>
+  <dd class="col-sm-8">{{ 'Requested' if job.bootstrap else 'Not requested' }}</dd>
+</dl>
+
+<div class="d-flex flex-wrap gap-2 mb-4">
+  {% if job.status == 'done' %}
+  <a class="btn btn-primary"
+     href="{{ url_for('porosity_result', run_id=job.result_id or job.id, session_id=session_id) }}">
+    View existing result
+  </a>
+  {% elif job.status in ['queued', 'running'] %}
+  <a class="btn btn-primary"
+     href="{{ url_for('porosity_job', job_id=job.id, session_id=session_id) }}">
+    View current progress
+  </a>
+  {% endif %}
+  <a class="btn btn-outline-secondary"
+     href="{{ url_for('porosity_calculator', session_id=session_id) }}">
+    Back to analyses
+  </a>
+</div>
+
+{% if not job.legacy and job.status not in ['queued', 'running'] %}
+<div class="border rounded p-3">
+  <h3 class="h5 mt-0">Recalculate at the same link</h3>
+  <p class="text-muted small">
+    This replaces the saved result while preserving the analysis hash and link.
+  </p>
+  <form method="POST"
+        action="{{ url_for('porosity_job_recalculate', job_id=job.id, session_id=session_id) }}">
+    <div class="form-check mb-3">
+      <input class="form-check-input" id="bootstrap" name="bootstrap" value="yes"
+             type="checkbox" {% if requested_bootstrap %}checked{% endif %}>
+      <label class="form-check-label" for="bootstrap">
+        Calculate a 95% bootstrap confidence interval (may take several minutes)
+      </label>
+    </div>
+    <button class="btn btn-warning" type="submit">Recalculate and replace result</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
