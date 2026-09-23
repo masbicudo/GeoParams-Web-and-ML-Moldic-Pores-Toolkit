@@ -2,6 +2,14 @@
 
 This project analyzes how geologists parameterize and interpret petrographic thin sections.
 
+> **Project status:** The `main` branch is kept aligned with the reproducible
+> software artifact associated with the published article. Active development
+> of the data-collection application continues on the
+> [`app-v2`](https://github.com/masbicudo/GeoParams-Web-and-ML-Moldic-Pores-Toolkit/tree/app-v2)
+> branch. To reproduce the publication from an immutable reference, use the
+> [`publication-cageo-2026`](https://github.com/masbicudo/GeoParams-Web-and-ML-Moldic-Pores-Toolkit/tree/publication-cageo-2026)
+> tag.
+
 ## Requirements
 
 - PDM (Python package manager)
