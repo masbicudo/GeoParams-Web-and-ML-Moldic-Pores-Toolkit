@@ -33,6 +33,7 @@
 <script>
 (() => {
   const statusUrl = {{ url_for('porosity_job_status', job_id=job.id, session_id=session_id) | tojson }};
+  const resultUrlTemplate = {{ url_for('porosity_result', run_id='RESULT_ID', session_id=session_id) | tojson }};
   const bar = document.getElementById('job-progress-bar');
   const percent = document.getElementById('job-progress-percent');
   const message = document.getElementById('job-progress-message');
@@ -69,7 +70,7 @@
         stopped = true;
         bar.classList.remove('progress-bar-animated');
         detail.textContent = 'Opening the result…';
-        window.location.replace(job.result_url);
+        window.location.replace(resultUrlTemplate.replace('RESULT_ID', job.result_id));
         return;
       }
       window.setTimeout(updateProgress, 750);

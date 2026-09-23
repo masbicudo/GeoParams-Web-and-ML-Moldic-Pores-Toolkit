@@ -367,12 +367,6 @@ def porosity_job_status(job_id):
         job = get_porosity_job(job_id)
     except PorosityToolError as exc:
         return jsonify({'status': 'error', 'error': str(exc)}), 404
-    if job['status'] == 'done':
-        job['result_url'] = url_for(
-            'porosity_result',
-            run_id=job['result_id'],
-            session_id=request.args.get('session_id'),
-        )
     return jsonify(job)
 
 
