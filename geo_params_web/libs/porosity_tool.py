@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from functools import lru_cache
+import hashlib
 import importlib.util
 import json
 import math
@@ -22,7 +23,7 @@ from werkzeug.datastructures import FileStorage
 from libs.upload_datasets import ALLOWED_EXTENSIONS, DatasetError, list_datasets, uploads_root
 
 
-RUN_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+RUN_ID_RE = re.compile(r"^(?:[0-9a-f]{32}|[0-9a-f]{64})$")
 PRIMARY_POROSITY_KEY = "porosity_20p"
 ProgressCallback = Callable[[float, str], None]
 
@@ -127,6 +128,47 @@ def parameter_sets() -> list[dict]:
     return sets
 
 
+def selected_parameter_set(dataset_id: str) -> tuple[dict, pd.DataFrame]:
+    selected = next((item for item in parameter_sets() if item["id"] == dataset_id), None)
+    if selected is None:
+        raise PorosityToolError("Select a valid named parameter dataset.")
+    params_df = load_dataset_parameters(dataset_id)
+    if params_df.empty:
+        raise PorosityToolError(
+            f"The dataset '{selected['name']}' does not contain completed parameter measurements."
+        )
+    return selected, params_df
+
+
+def analysis_identity(
+    dataset_id: str,
+    params_df: pd.DataFrame,
+    image_path: Path,
+) -> tuple[str, str, str]:
+    """Hash the image and exact scientific parameter multiset used by a job."""
+    image_hasher = hashlib.sha256()
+    with image_path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            image_hasher.update(chunk)
+    image_sha256 = image_hasher.hexdigest()
+
+    parameter_pairs = sorted(
+        (int(row.clicked_x), int(row.clicked_y))
+        for row in params_df[["clicked_x", "clicked_y"]].itertuples(index=False)
+    )
+    parameter_payload = json.dumps(parameter_pairs, separators=(",", ":")).encode("ascii")
+    parameters_sha256 = hashlib.sha256(parameter_payload).hexdigest()
+
+    identity = hashlib.sha256()
+    identity.update(b"geo-params-porosity-v1\0")
+    identity.update(dataset_id.encode("utf-8"))
+    identity.update(b"\0")
+    identity.update(parameters_sha256.encode("ascii"))
+    identity.update(b"\0")
+    identity.update(image_sha256.encode("ascii"))
+    return identity.hexdigest(), image_sha256, parameters_sha256
+
+
 def _safe_run_dir(run_id: str) -> Path:
     if not RUN_ID_RE.fullmatch(run_id):
         raise PorosityToolError("Invalid analysis identifier.")
@@ -145,6 +187,91 @@ def _json_value(value):
     return value
 
 
+def analyze_saved_image(
+    dataset_id: str,
+    dataset_name: str,
+    params_df: pd.DataFrame,
+    input_path: Path,
+    original_name: str,
+    bootstrap: bool,
+    run_id: str,
+    progress_callback: ProgressCallback | None = None,
+) -> dict:
+    def progress(fraction: float, message: str) -> None:
+        if progress_callback is not None:
+            progress_callback(max(0.0, min(1.0, fraction)), message)
+
+    run_dir = _safe_run_dir(run_id)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    method = _scientific_module()
+    measure_end = 0.58 if bootstrap else 0.92
+    summary, per_parameter, mean_mask, measured_image = method.measure_image(
+        input_path,
+        params_df,
+        {},
+        method.DEFAULT_THRESHOLDS,
+        progress_callback=lambda fraction, message: progress(
+            0.05 + (measure_end - 0.05) * fraction,
+            message,
+        ),
+    )
+
+    mask_path = run_dir / "superposition_mean_mask.png"
+    if not cv2.imwrite(str(mask_path), mean_mask.astype(np.uint8)):
+        raise PorosityToolError("The superposition mask could not be saved.")
+
+    if bootstrap:
+        replicates = max(1, int(os.getenv("POROSITY_BOOTSTRAP_REPLICATES", "200")))
+        summary.update(
+            method.bootstrap_superposition_porosities(
+                measured_image,
+                params_df,
+                method.DEFAULT_THRESHOLDS,
+                method.DEFAULT_NULL_PORE_PIXEL_THRESHOLD,
+                method.DEFAULT_MIN_VALID_SAMPLE_FRACTION,
+                replicates,
+                42,
+                method.DEFAULT_BOOTSTRAP_CHUNK_PIXELS,
+                original_name,
+                run_dir,
+                progress_callback=lambda fraction, message: progress(
+                    0.60 + 0.36 * fraction,
+                    message,
+                ),
+            )
+        )
+
+    progress(0.97, "Saving analysis results")
+    clean_summary = {key: _json_value(value) for key, value in summary.items()}
+    result = {
+        "version": 2,
+        "id": run_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "dataset_id": dataset_id,
+        "dataset_name": dataset_name,
+        "original_filename": original_name,
+        "input_filename": input_path.name,
+        "mask_filename": mask_path.name,
+        "bootstrap_requested": bootstrap,
+        "summary": clean_summary,
+        "threshold_results": [
+            {
+                "threshold": threshold,
+                "key": method.threshold_column_name(threshold),
+                "value": clean_summary[method.threshold_column_name(threshold)],
+            }
+            for threshold in method.DEFAULT_THRESHOLDS
+        ],
+        "per_parameter_count": len(per_parameter),
+    }
+    temporary = run_dir / "result.json.tmp"
+    with temporary.open("w", encoding="utf-8") as stream:
+        json.dump(result, stream, indent=2, ensure_ascii=False)
+    os.replace(temporary, run_dir / "result.json")
+    progress(1.0, "Analysis complete")
+    return result
+
+
 def analyze_upload(
     dataset_id: str,
     upload: FileStorage,
@@ -156,16 +283,7 @@ def analyze_upload(
             progress_callback(max(0.0, min(1.0, fraction)), message)
 
     progress(0.01, "Validating image and parameter dataset")
-    available = {item["id"]: item for item in parameter_sets()}
-    selected = available.get(dataset_id)
-    if selected is None:
-        raise PorosityToolError("Select a valid named parameter dataset.")
-
-    params_df = load_dataset_parameters(dataset_id)
-    if params_df.empty:
-        raise PorosityToolError(
-            f"The dataset '{selected['name']}' does not contain completed parameter measurements."
-        )
+    selected, params_df = selected_parameter_set(dataset_id)
     if not upload or not upload.filename:
         raise PorosityToolError("Select a thin-section image to analyze.")
 
@@ -186,71 +304,16 @@ def analyze_upload(
         raise PorosityToolError("The uploaded file is not a readable image.")
 
     try:
-        method = _scientific_module()
-        measure_end = 0.58 if bootstrap else 0.92
-        summary, per_parameter, mean_mask, measured_image = method.measure_image(
-            input_path,
+        return analyze_saved_image(
+            dataset_id,
+            selected["name"],
             params_df,
-            {},
-            method.DEFAULT_THRESHOLDS,
-            progress_callback=lambda fraction, message: progress(
-                0.05 + (measure_end - 0.05) * fraction,
-                message,
-            ),
+            input_path,
+            original_name,
+            bootstrap,
+            run_id,
+            progress_callback=progress_callback,
         )
-
-        mask_path = run_dir / "superposition_mean_mask.png"
-        if not cv2.imwrite(str(mask_path), mean_mask.astype(np.uint8)):
-            raise PorosityToolError("The superposition mask could not be saved.")
-
-        if bootstrap:
-            replicates = max(1, int(os.getenv("POROSITY_BOOTSTRAP_REPLICATES", "200")))
-            summary.update(
-                method.bootstrap_superposition_porosities(
-                    measured_image,
-                    params_df,
-                    method.DEFAULT_THRESHOLDS,
-                    method.DEFAULT_NULL_PORE_PIXEL_THRESHOLD,
-                    method.DEFAULT_MIN_VALID_SAMPLE_FRACTION,
-                    replicates,
-                    42,
-                    method.DEFAULT_BOOTSTRAP_CHUNK_PIXELS,
-                    original_name,
-                    run_dir,
-                    progress_callback=lambda fraction, message: progress(
-                        0.60 + 0.36 * fraction,
-                        message,
-                    ),
-                )
-            )
-
-        progress(0.97, "Saving analysis results")
-        clean_summary = {key: _json_value(value) for key, value in summary.items()}
-        result = {
-            "version": 1,
-            "id": run_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "dataset_id": dataset_id,
-            "dataset_name": selected["name"],
-            "original_filename": original_name,
-            "input_filename": input_path.name,
-            "mask_filename": mask_path.name,
-            "bootstrap_requested": bootstrap,
-            "summary": clean_summary,
-            "threshold_results": [
-                {
-                    "threshold": threshold,
-                    "key": method.threshold_column_name(threshold),
-                    "value": clean_summary[method.threshold_column_name(threshold)],
-                }
-                for threshold in method.DEFAULT_THRESHOLDS
-            ],
-            "per_parameter_count": len(per_parameter),
-        }
-        with (run_dir / "result.json").open("w", encoding="utf-8") as stream:
-            json.dump(result, stream, indent=2, ensure_ascii=False)
-        progress(1.0, "Analysis complete")
-        return result
     except Exception as exc:
         shutil.rmtree(run_dir, ignore_errors=True)
         if isinstance(exc, PorosityToolError):

@@ -13,7 +13,9 @@ import numpy as np
 from werkzeug.datastructures import FileStorage
 
 from libs.porosity_tool import (
+    analysis_identity,
     analyze_upload,
+    load_dataset_parameters,
     load_result,
     parameter_sets,
     result_image_path,
@@ -78,6 +80,23 @@ class PorosityToolTests(unittest.TestCase):
         item = next(item for item in parameter_sets() if item["id"] == dataset["id"])
         self.assertEqual(item["name"], "Named measurements")
         self.assertEqual(item["parameter_count"], 1)
+
+    def test_identity_uses_image_and_exact_parameter_values(self) -> None:
+        dataset = self._dataset_with_measurement()
+        image_path = Path(self.uploads.name) / dataset["id"] / "originals" / dataset["images"][0]["stored_filename"]
+        params = load_dataset_parameters(dataset["id"])
+        first, image_hash, params_hash = analysis_identity(dataset["id"], params, image_path)
+        repeated, _, _ = analysis_identity(dataset["id"], params, image_path)
+        changed_params = params.copy()
+        changed_params.loc[0, "clicked_x"] = 8
+        changed, _, changed_params_hash = analysis_identity(
+            dataset["id"], changed_params, image_path
+        )
+        self.assertEqual(first, repeated)
+        self.assertEqual(len(first), 64)
+        self.assertEqual(len(image_hash), 64)
+        self.assertNotEqual(params_hash, changed_params_hash)
+        self.assertNotEqual(first, changed)
 
     def test_analyzes_upload_with_existing_scientific_method(self) -> None:
         dataset = self._dataset_with_measurement()
