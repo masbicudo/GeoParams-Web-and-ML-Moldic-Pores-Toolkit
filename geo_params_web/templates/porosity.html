@@ -140,5 +140,7 @@
 </div>
 {% endif %}
 
-{% include "_porosity_jobs.html" %}
+{% if not result %}
+  {% include "_porosity_jobs.html" %}
+{% endif %}
 {% endblock %}
