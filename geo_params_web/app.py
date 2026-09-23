@@ -59,6 +59,7 @@ from libs.parameter_collections import (
     save_collection_session,
     update_parameter_collection,
 )
+from libs.execution_slots import processing_slot
 
 register_job_provider(
     key='porosity',
@@ -304,9 +305,44 @@ def task_executor(session_id: str, task_name: str,
 
 initial_image_setup_lock = threading.Lock()
 def initial_image_setup(session_id, count_timeouts: int = 0):
-#   with initial_image_setup_lock:
     if count_timeouts > 3:
         raise ValueError("Too many timeouts, aborting initial image setup.")
+
+    def report_wait(ahead: int):
+        _sync_collection(
+            session_id,
+            status="queued",
+            stage="image_processing",
+            progress=0,
+            message=(
+                f"Waiting for the shared processing slot ({ahead} workflow(s) ahead)"
+                if ahead
+                else "Waiting for the shared processing slot"
+            ),
+            error=None,
+        )
+
+    _sync_collection(
+        session_id,
+        status="queued",
+        stage="image_processing",
+        progress=0,
+        message="Waiting for the shared processing slot",
+        error=None,
+    )
+    with processing_slot(f"parameter-collection:{session_id}", on_wait=report_wait):
+        _sync_collection(
+            session_id,
+            status="running",
+            stage="image_processing",
+            progress=0,
+            message="Preparing parameter space",
+            error=None,
+        )
+        _initial_image_setup_work(session_id, count_timeouts)
+
+
+def _initial_image_setup_work(session_id, count_timeouts: int = 0):
     
     session = get_session(session_id)
 
@@ -521,7 +557,7 @@ def parameter_collection_page(job_id):
 def parameter_collection_status(job_id):
     try:
         collection = get_parameter_collection(job_id)
-        if not collection.get("legacy") and collection.get("status") == "running":
+        if not collection.get("legacy") and collection.get("status") in {"queued", "running"}:
             session = _restore_collection_session(collection)
             task = session.get("tasks", {}).get("initial_image_setup")
             if task and task.get("state") == "Requested" and task.get("alive_tag") is None:
@@ -817,17 +853,17 @@ def params_select(session_id):
             
             min_pore_size = int(data.get('min_pore_size', 480))
             
-            task_executor(session_id, "initial_image_setup",
-                        0, [min_pore_size])
-
             _sync_collection(
                 session_id,
-                status="running",
+                status="queued",
                 stage="image_processing",
                 progress=0,
-                message="Preparing parameter space",
+                message="Waiting for the shared processing slot",
                 error=None,
             )
+            task_executor(session_id, "initial_image_setup",
+                        0, [min_pore_size])
+            save_collection_session(collection["id"], session)
 
             print("Received min_pore_size:", min_pore_size)
             return jsonify({
@@ -1109,16 +1145,17 @@ def image_select(session_id):
         os.makedirs(f"static/output/{session_id}/{session['counter']}", exist_ok=True)
         cv2.imwrite(output_path, cropped)
 
-        task_executor(session_id, "initial_image_setup",
-                      0, [480])
         _sync_collection(
             session_id,
-            status="running",
+            status="queued",
             stage="image_processing",
             progress=0,
-            message="Preparing parameter space",
+            message="Waiting for the shared processing slot",
             error=None,
         )
+        task_executor(session_id, "initial_image_setup",
+                      0, [480])
+        save_collection_session(collection["id"], session)
 
         return redirect(
             url_for("parameter_collection_page", job_id=collection["id"])

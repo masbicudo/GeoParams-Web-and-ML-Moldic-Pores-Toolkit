@@ -12,17 +12,17 @@
      href="{{ url_for('parameter_collections') }}">All collections</a>
 </div>
 
-{% if collection.status == 'running' %}
+{% if collection.status in ['queued', 'running'] %}
 <p class="text-muted">
-  An automated step is running within this collection flow. It will release
-  its processing slot before the next user-input stage begins.
+  An automated step is part of this collection flow. It will release its
+  processing slot before the next user-input stage begins.
 </p>
 <div id="collection-progress-panel" aria-live="polite">
   <div class="progress porosity-progress mb-3" role="progressbar"
        aria-label="Collection processing progress"
        aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ collection.progress }}">
     <div id="collection-progress-bar"
-         class="progress-bar progress-bar-striped progress-bar-animated"
+         class="progress-bar progress-bar-striped progress-bar-animated {{ 'bg-warning' if collection.status == 'queued' else '' }}"
          style="width: {{ collection.progress }}%">
       <span id="collection-progress-percent">{{ collection.progress }}%</span>
     </div>
@@ -57,7 +57,7 @@
       message.textContent = item.message || 'Processing';
       progress.setAttribute('aria-valuenow', String(value));
 
-      if (item.status !== 'running') {
+      if (item.status !== 'running' && item.status !== 'queued') {
         window.location.replace(pageUrl);
         return;
       }

@@ -16,7 +16,7 @@ from libs.upload_datasets import uploads_root
 
 
 COLLECTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
-ACTIVE_STATUSES = {"awaiting_input", "running"}
+ACTIVE_STATUSES = {"awaiting_input", "queued", "running"}
 TERMINAL_STATUSES = {"done", "canceled", "error"}
 
 STAGE_LABELS = {

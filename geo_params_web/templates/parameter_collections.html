@@ -52,6 +52,9 @@
           {% elif item.status == 'running' %}
             <span class="job-status-icon job-status-running" aria-hidden="true">●</span>
             <span class="small">Processing {{ item.progress }}%</span>
+          {% elif item.status == 'queued' %}
+            <span class="job-status-icon job-status-queued" aria-hidden="true">◷</span>
+            <span class="small">Waiting for processing</span>
           {% elif item.status == 'awaiting_input' %}
             <span class="job-status-icon job-status-input" aria-hidden="true">✎</span>
             <span class="small">Input needed</span>
@@ -85,7 +88,7 @@
         <td class="text-end">
           <a class="btn btn-sm btn-outline-primary"
              href="{{ url_for('parameter_collection_page', job_id=item.id) }}">
-            {% if item.status == 'done' or item.status == 'canceled' %}Summary{% elif item.status == 'running' %}Progress{% else %}Continue{% endif %}
+            {% if item.status == 'done' or item.status == 'canceled' %}Summary{% elif item.status in ['queued', 'running'] %}Progress{% else %}Continue{% endif %}
           </a>
         </td>
       </tr>

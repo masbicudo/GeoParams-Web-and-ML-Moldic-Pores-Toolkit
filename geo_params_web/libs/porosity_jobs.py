@@ -24,6 +24,7 @@ from libs.porosity_tool import (
     selected_parameter_set,
 )
 from libs.upload_datasets import ALLOWED_EXTENSIONS
+from libs.execution_slots import processing_slot
 
 
 JOB_ID_RE = re.compile(r"^(?:[0-9a-f]{32}|[0-9a-f]{64})$")
@@ -203,9 +204,9 @@ def _worker_loop() -> None:
                 continue
             _active_job_id = job_id
             job.update(
-                status="running",
-                progress=1,
-                message="Starting analysis",
+                status="queued",
+                progress=0,
+                message="Waiting for the shared processing slot",
                 queue_position=0,
                 updated_at=_utc_now(),
             )
@@ -220,22 +221,41 @@ def _worker_loop() -> None:
             )
 
         try:
-            job_dir = _job_dir(job_id)
-            input_path = (job_dir / job["input_filename"]).resolve()
-            params_path = (job_dir / job["parameters_filename"]).resolve()
-            if input_path.parent != job_dir or params_path.parent != job_dir:
-                raise PorosityToolError("Analysis job contains an invalid file path.")
-            params_df = pd.read_csv(params_path)
-            result = analyze_saved_image(
-                job["dataset_id"],
-                job["dataset_name"],
-                params_df,
-                input_path,
-                job["original_filename"],
-                bool(job["bootstrap"]),
-                job_id,
-                progress_callback=report,
-            )
+            def report_wait(ahead: int) -> None:
+                _update_job(
+                    job_id,
+                    status="queued",
+                    progress=0,
+                    message=(
+                        f"Waiting for the shared processing slot ({ahead} workflow(s) ahead)"
+                        if ahead
+                        else "Waiting for the shared processing slot"
+                    ),
+                )
+
+            with processing_slot(f"porosity:{job_id}", on_wait=report_wait):
+                _update_job(
+                    job_id,
+                    status="running",
+                    progress=1,
+                    message="Starting analysis",
+                )
+                job_dir = _job_dir(job_id)
+                input_path = (job_dir / job["input_filename"]).resolve()
+                params_path = (job_dir / job["parameters_filename"]).resolve()
+                if input_path.parent != job_dir or params_path.parent != job_dir:
+                    raise PorosityToolError("Analysis job contains an invalid file path.")
+                params_df = pd.read_csv(params_path)
+                result = analyze_saved_image(
+                    job["dataset_id"],
+                    job["dataset_name"],
+                    params_df,
+                    input_path,
+                    job["original_filename"],
+                    bool(job["bootstrap"]),
+                    job_id,
+                    progress_callback=report,
+                )
             _update_job(
                 job_id,
                 status="done",
