@@ -23,6 +23,18 @@ def new_session_data():
         'processes': {}
         }
 
+def create_session(data=None):
+    """Create an application session and return its opaque identifier."""
+    session_id = str(uuid.uuid4())
+    with global_lock:
+        session_store[session_id] = data if data is not None else new_session_data()
+    return session_id
+
+def restore_session(session_id, data):
+    """Restore a persisted workflow session under its original identifier."""
+    with global_lock:
+        session_store[session_id] = data
+
 def setup_progress(session_id, task_name, total_steps, timeout=60*60*24):
     with global_lock:
         session = session_store[session_id]
