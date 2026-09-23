@@ -179,6 +179,21 @@ directory from the host.
 The maximum upload request is 1024 MB by default. Set `MAX_UPLOAD_MB` before
 starting Docker to use a lower Flask limit.
 
+### Porosity calculator
+
+The application home page also provides a porosity calculator for new
+thin-section images. Select a named dataset that already has completed C/K
+parameter measurements, upload the image to analyze, and the application
+applies the existing scientific superposition method from
+`user_params_porosity/measure_porosity_from_params.py`.
+
+The main result is the manuscript-compatible `porosity_20p` estimate. The
+other normalized thresholds and diagnostic counts are shown alongside the
+mean superposition mask. A 95% bootstrap confidence interval is available as
+an optional, explicitly slower calculation. Analysis inputs and results are
+stored under the ignored host-mounted `geo_params_web/data/uploads/` folder,
+so recreating the Docker container does not erase them.
+
 ### Local development
 
 1. Open Visual Studio Code from the `geo_params_web` folder.
