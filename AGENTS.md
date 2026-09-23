@@ -2,6 +2,18 @@
 
 Guidance for future coding agents working in this repository.
 
+## Branch Purpose
+
+The `app-v2` branch is the integration branch for active application
+development. Implement reusable research workflows here on short-lived feature
+branches, then merge them into `app-v2` after validation.
+
+The `main` branch remains the reader-facing reproducible artifact associated
+with the publication. The immutable `publication-cageo-2026` tag identifies
+the exact published baseline. Do not merge `app-v2` wholesale into `main`;
+port shared fixes deliberately when they are also appropriate for the
+scientific artifact.
+
 ## Repository Shape
 
 This repository is the public, reproducible artifact for the manuscript. Keep
@@ -75,7 +87,8 @@ instead of exposing a long traceback as the first user-facing experience.
 
 ## Scope Control
 
-Do not import experimental methodology from external collaboration folders
-unless the manuscript explicitly needs it. Improvements developed in other
-collaborations can be mentioned as future work, but the public artifact should
-preserve the method used in the manuscript unless the manuscript changes too.
+New application capabilities should be generic and reusable rather than tied
+to a specific student or dataset. Keep collaborator images, personal data,
+credentials, and generated results outside Git. Experimental methodology may
+be developed on feature branches, but it should enter `app-v2` only after its
+purpose, inputs, and limitations are documented.
