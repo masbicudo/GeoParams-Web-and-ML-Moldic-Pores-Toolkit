@@ -68,7 +68,16 @@ while (-not (Test-DockerCommand @("info"))) {
 }
 
 $DatasetDir = Join-Path $RepoDir "datasets\article_thin_sections"
-while (-not (Test-Path -LiteralPath $DatasetDir -PathType Container)) {
+$CacheDir = Join-Path $AppDir "static\imgs_sections"
+$MetadataFile = Join-Path $CacheDir "metadata.json"
+$CachedImages = @(Get-ChildItem -LiteralPath $CacheDir -File `
+    -ErrorAction SilentlyContinue | Where-Object {
+        $_.Extension -in @(".jpg", ".jpeg", ".png")
+    })
+$CacheReady = (Test-Path -LiteralPath $MetadataFile -PathType Leaf) -and
+    $CachedImages.Count -gt 0
+while (-not (Test-Path -LiteralPath $DatasetDir -PathType Container) -and
+    -not $CacheReady) {
     Write-Host "The public petrographic image dataset was not found."
     Write-Host "Download it from: $DatasetUrl"
     Write-Host "Place it in: $DatasetDir"
@@ -97,9 +106,13 @@ try {
     Invoke-DockerStep "[1/4] Building the application" @(
         "compose", "build"
     )
-    Invoke-DockerStep "[2/4] Preparing petrographic images" @(
-        "compose", "run", "--rm", "prepare"
-    )
+    if (Test-Path -LiteralPath $DatasetDir -PathType Container) {
+        Invoke-DockerStep "[2/4] Preparing petrographic images" @(
+            "compose", "run", "--rm", "prepare"
+        )
+    } else {
+        Write-Host "[2/4] Using the existing image cache... done"
+    }
     Invoke-DockerStep "[3/4] Starting the web application" @(
         "compose", "up", "-d", "app", "nginx"
     )

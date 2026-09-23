@@ -55,7 +55,20 @@ while ! docker info >/dev/null 2>&1; do
     retry_or_exit
 done
 
-while [ ! -d "$repo_dir/datasets/article_thin_sections" ]; do
+source_images="$repo_dir/datasets/article_thin_sections"
+cache_dir="$app_dir/static/imgs_sections"
+cache_ready=false
+if [ -f "$cache_dir/metadata.json" ]; then
+    for cached_image in "$cache_dir"/*.jpg "$cache_dir"/*.jpeg \
+        "$cache_dir"/*.png; do
+        if [ -f "$cached_image" ]; then
+            cache_ready=true
+            break
+        fi
+    done
+fi
+
+while [ ! -d "$source_images" ] && [ "$cache_ready" = false ]; do
     echo "The public petrographic image dataset was not found."
     echo "Download it from: $dataset_url"
     echo "Place it in: $repo_dir/datasets/article_thin_sections"
@@ -79,7 +92,12 @@ mkdir -p "$app_dir/data/uploads" "$app_dir/log"
 
 cd "$app_dir"
 run_step "[1/4] Building the application" docker compose build
-run_step "[2/4] Preparing petrographic images" docker compose run --rm prepare
+if [ -d "$source_images" ]; then
+    run_step "[2/4] Preparing petrographic images" \
+        docker compose run --rm prepare
+else
+    echo "[2/4] Using the existing petrographic image cache... done"
+fi
 run_step "[3/4] Starting the web application" docker compose up -d app nginx
 
 printf "[4/4] Waiting for the web interface... "
