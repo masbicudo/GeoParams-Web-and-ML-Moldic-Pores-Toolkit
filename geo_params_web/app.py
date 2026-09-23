@@ -40,6 +40,15 @@ from libs.porosity_jobs import (
     submit_porosity_job,
 )
 from libs.porosity_exports import build_results_csv
+from libs.job_registry import list_active_jobs, register_job_provider
+
+register_job_provider(
+    key='porosity',
+    label='Porosity Calculator',
+    list_jobs=list_porosity_jobs,
+    tool_endpoint='porosity_calculator',
+    job_endpoint='porosity_job',
+)
 
 from dotenv import load_dotenv
 load_dotenv(".env", override=False)
@@ -321,12 +330,23 @@ def index(session_id):
                            session_id=session_id,
                            session=session,
                            user_name=user_name,
+                           active_job_count=len(list_active_jobs()),
                            )
 
 
 @app.route('/about-data')
 def about_data():
     return render_template('about_data.html')
+
+
+@app.route('/jobs')
+def jobs_overview():
+    session_id = request.args.get('session_id')
+    return render_template(
+        'active_jobs.html',
+        session_id=session_id,
+        jobs=list_active_jobs(),
+    )
 
 
 @app.route('/porosity', methods=['GET', 'POST'])

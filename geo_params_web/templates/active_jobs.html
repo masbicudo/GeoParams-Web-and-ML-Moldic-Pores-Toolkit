@@ -1,0 +1,61 @@
+{% extends "base_form.html" %}
+
+{% block title %}Active jobs{% endblock %}
+
+{% block content_1 %}
+<div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+  <div>
+    <h2>Active jobs</h2>
+    <p class="text-muted mb-0">
+      Jobs currently running or waiting across all application tools.
+    </p>
+  </div>
+  <a class="btn btn-outline-secondary"
+     href="{{ url_for('index', session_id=session_id) }}">Home</a>
+</div>
+
+{% if jobs %}
+<p class="small text-muted">This view refreshes automatically while jobs are active.</p>
+<div class="list-group">
+  {% for job in jobs %}
+  <div class="list-group-item">
+    <div class="d-flex justify-content-between align-items-start gap-3">
+      <div>
+        <div class="mb-1">
+          {% if job.status == 'running' %}
+            <span class="job-status-icon job-status-running" aria-hidden="true">●</span>
+            <span class="visually-hidden">Running</span>
+          {% else %}
+            <span class="job-status-icon job-status-queued" aria-hidden="true">◷</span>
+            <span class="visually-hidden">Waiting</span>
+          {% endif %}
+          <a href="{{ url_for(job.tool_endpoint, session_id=session_id) }}">
+            {{ job.tool_name }}
+          </a>
+        </div>
+        <a class="fw-semibold font-monospace"
+           href="{{ url_for(job.job_endpoint, job_id=job.id, session_id=session_id) }}">
+          Job {{ job.short_id }}…
+        </a>
+        <div class="small text-muted mt-1">
+          {{ job.title }}{% if job.detail %} · {{ job.detail }}{% endif %}
+        </div>
+        <div class="small mt-1">{{ job.message }}</div>
+      </div>
+      <span class="badge {{ 'text-bg-primary' if job.status == 'running' else 'text-bg-warning' }}">
+        {% if job.status == 'running' %}{{ job.progress }}%{% else %}Waiting{% endif %}
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<script>
+  window.setTimeout(() => window.location.reload(), 3000);
+</script>
+{% else %}
+<div class="alert alert-light border" role="status">
+  No jobs are running or waiting right now. Completed jobs remain available in
+  their respective tool pages.
+</div>
+{% endif %}
+{% endblock %}

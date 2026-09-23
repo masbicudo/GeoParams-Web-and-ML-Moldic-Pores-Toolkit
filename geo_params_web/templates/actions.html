@@ -45,6 +45,14 @@
       </div>
     </div>
 
+    <a href="{{ url_for('jobs_overview', session_id=session_id) }}"
+      class="btn btn-light">
+      Active jobs
+      <span class="badge {{ 'text-bg-primary' if active_job_count else 'text-bg-secondary' }} ms-1">
+        {{ active_job_count }}
+      </span>
+    </a>
+
     <a href="/stats/"
       class="btn btn-light"
       >{{lr.str.statistics}}</a>
