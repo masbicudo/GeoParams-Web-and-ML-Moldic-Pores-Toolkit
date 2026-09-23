@@ -1,94 +1,61 @@
 # AGENTS.md
 
-Guidance for future coding agents working in this repository.
+Guidance for coding agents working in this repository.
 
-## Branch Purpose
+## Branches
 
-The `app-v2` branch is the integration branch for active application
-development. Implement reusable research workflows here on short-lived feature
-branches, then merge them into `app-v2` after validation.
+- `main` is the research branch associated with the publication.
+- Keep `main` suitable for readers reproducing the published work.
+- `publication-cageo-2026` is the exact published baseline.
+- `app-v2` is the integration branch for active app development.
+- Start app features on short-lived branches based on `app-v2`.
+- Merge validated app features into `app-v2` with small commits.
+- Never merge all of `app-v2` into `main`.
+- Port fixes to `main` only when they suit the research artifact.
+- Keep the branch READMEs distinct and link them to each other.
+- Explain in `main` that app development continues on `app-v2`.
 
-The `main` branch remains the reader-facing reproducible artifact associated
-with the publication. The immutable `publication-cageo-2026` tag identifies
-the exact published baseline. Do not merge `app-v2` wholesale into `main`;
-port shared fixes deliberately when they are also appropriate for the
-scientific artifact.
+## Repository
 
-## Repository Shape
+- Keep this public repository reproducible and easy to inspect.
+- `geo_params_web` contains the collection and statistics app.
+- `ml_moldic_pores` contains ML notebooks and models.
+- `user_params_porosity` measures porosity from user parameters.
+- Run each subproject from its own PDM environment and directory.
 
-This repository is the public, reproducible artifact for the manuscript. Keep
-it narrower and cleaner than the historical research sandbox.
+## Data
 
-Subprojects:
+- Keep large datasets in the ignored repository-level `datasets/`.
+- Version small metadata when it defines a reproducible method.
+- Keep uploads, caches, generated results, and credentials out of Git.
+- Store persistent app data in a bind-mounted, ignored host directory.
+- Never rely on a Docker container layer for persistent user data.
+- Treat generated outputs as caches, not as source datasets.
 
-- `geo_params_web` - data-collection and statistics app.
-- `ml_moldic_pores` - machine-learning notebooks and models.
-- `user_params_porosity` - post-collection porosity measurements using user
-  parameters.
+## Privacy
 
-Each subproject has its own PDM environment and should be run from its own
-directory.
+- Only personal data is sensitive by default.
+- Do not expose personal data in public lists, summaries, or examples.
+- Do not use personal names in commit messages.
+- Dataset names and filenames may appear in lists and summaries.
 
-## Data Layout
+## Workflows
 
-Large image datasets live in the repository-level `datasets/` directory and
-are ignored by Git:
+- A tool flow may include human steps and automated jobs.
+- Human input must not hold an automated processing slot.
+- Show automated progress as part of its parent tool flow.
+- Serialize jobs that compete for the same processing resource.
+- Mark flows waiting for user input without blocking queued jobs.
+- Make completed parameter collections read-only.
+- Open completed collections on a summary page.
+- Put flow lists on tool landing pages, not on result pages.
+- Show active flows from all tools in the global helper.
+- Persist job state and results in the mounted data directory.
 
-```text
-datasets/
-  article_thin_sections/
-  generalization_test_thin_sections/
-  pore_type_training/
-```
+## Paths and Commands
 
-Small metadata that defines a method, such as crop rectangles, can be
-versioned. Large images, generated outputs, caches, and derived analysis tables
-should normally stay ignored unless they are final manuscript artifacts.
-
-## Derived Data
-
-Treat subproject data/output directories as local caches or generated outputs:
-
-- `geo_params_web/static/imgs_sections/` is a cache for the Flask app.
-- `ml_moldic_pores/out/` is a cache for ML-ready derived images/models.
-- `user_params_porosity/data/output/` is generated porosity output.
-
-Do not make a generated cache the conceptual source of truth when a dataset or
-metadata file can be referenced directly.
-
-## Notebooks and Paths
-
-VS Code is configured to run notebooks from the subproject workspace root with:
-
-```json
-"jupyter.notebookFileRoot": "${workspaceFolder}"
-```
-
-New notebooks and scripts should use paths relative to the subproject root, or
-resolve paths from `Path(__file__)` for importable modules. Avoid relying on
-the notebook file's directory as the current working directory.
-
-## Reader Experience
-
-Prefer short, safe commands in README entry points. A reviewer or reader should
-be able to run a smoke test without copying long path-heavy commands.
-
-Good first-contact commands look like:
-
-```bash
-pdm run python quick_test.py
-pdm run python run_generalization_test.py
-```
-
-Keep long configurable commands in "Advanced Usage" sections.
-
-CLI failures should explain the missing path and the expected dataset layout
-instead of exposing a long traceback as the first user-facing experience.
-
-## Scope Control
-
-New application capabilities should be generic and reusable rather than tied
-to a specific student or dataset. Keep collaborator images, personal data,
-credentials, and generated results outside Git. Experimental methodology may
-be developed on feature branches, but it should enter `app-v2` only after its
-purpose, inputs, and limitations are documented.
+- Resolve script paths from the subproject root or `Path(__file__)`.
+- Do not depend on a notebook file's directory as the working directory.
+- Keep README entry commands short and safe to copy.
+- Put long configurable commands in an advanced section.
+- Report missing paths and expected layouts without noisy tracebacks.
