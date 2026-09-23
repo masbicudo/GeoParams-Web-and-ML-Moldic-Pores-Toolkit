@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import uuid
+from typing import Callable
 
 import cv2
 import numpy as np
@@ -23,6 +24,7 @@ from libs.upload_datasets import ALLOWED_EXTENSIONS, DatasetError, list_datasets
 
 RUN_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 PRIMARY_POROSITY_KEY = "porosity_20p"
+ProgressCallback = Callable[[float, str], None]
 
 
 class PorosityToolError(ValueError):
@@ -147,7 +149,13 @@ def analyze_upload(
     dataset_id: str,
     upload: FileStorage,
     bootstrap: bool,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict:
+    def progress(fraction: float, message: str) -> None:
+        if progress_callback is not None:
+            progress_callback(max(0.0, min(1.0, fraction)), message)
+
+    progress(0.01, "Validating image and parameter dataset")
     available = {item["id"]: item for item in parameter_sets()}
     selected = available.get(dataset_id)
     if selected is None:
@@ -179,11 +187,16 @@ def analyze_upload(
 
     try:
         method = _scientific_module()
+        measure_end = 0.58 if bootstrap else 0.92
         summary, per_parameter, mean_mask, measured_image = method.measure_image(
             input_path,
             params_df,
             {},
             method.DEFAULT_THRESHOLDS,
+            progress_callback=lambda fraction, message: progress(
+                0.05 + (measure_end - 0.05) * fraction,
+                message,
+            ),
         )
 
         mask_path = run_dir / "superposition_mean_mask.png"
@@ -204,9 +217,14 @@ def analyze_upload(
                     method.DEFAULT_BOOTSTRAP_CHUNK_PIXELS,
                     original_name,
                     run_dir,
+                    progress_callback=lambda fraction, message: progress(
+                        0.60 + 0.36 * fraction,
+                        message,
+                    ),
                 )
             )
 
+        progress(0.97, "Saving analysis results")
         clean_summary = {key: _json_value(value) for key, value in summary.items()}
         result = {
             "version": 1,
@@ -231,6 +249,7 @@ def analyze_upload(
         }
         with (run_dir / "result.json").open("w", encoding="utf-8") as stream:
             json.dump(result, stream, indent=2, ensure_ascii=False)
+        progress(1.0, "Analysis complete")
         return result
     except Exception as exc:
         shutil.rmtree(run_dir, ignore_errors=True)

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
 import unittest
 
 import cv2
@@ -17,6 +18,7 @@ from libs.porosity_tool import (
     parameter_sets,
     result_image_path,
 )
+from libs.porosity_jobs import get_porosity_job, submit_porosity_job
 from libs.upload_datasets import create_dataset
 
 
@@ -79,11 +81,20 @@ class PorosityToolTests(unittest.TestCase):
 
     def test_analyzes_upload_with_existing_scientific_method(self) -> None:
         dataset = self._dataset_with_measurement()
-        result = analyze_upload(dataset["id"], blue_image_upload(), bootstrap=False)
+        updates = []
+        result = analyze_upload(
+            dataset["id"],
+            blue_image_upload(),
+            bootstrap=False,
+            progress_callback=lambda fraction, message: updates.append((fraction, message)),
+        )
         self.assertAlmostEqual(result["summary"]["porosity_20p"], 1.0)
         self.assertFalse(result["bootstrap_requested"])
         self.assertTrue(result_image_path(result["id"], "mask").is_file())
         self.assertEqual(load_result(result["id"])["dataset_name"], "Named measurements")
+        self.assertGreater(len(updates), 3)
+        self.assertEqual(updates[-1], (1.0, "Analysis complete"))
+        self.assertEqual(sorted(value for value, _ in updates), [value for value, _ in updates])
 
     def test_optional_bootstrap_adds_confidence_interval(self) -> None:
         dataset = self._dataset_with_measurement()
@@ -97,6 +108,19 @@ class PorosityToolTests(unittest.TestCase):
             result["summary"]["porosity_20p_bootstrap_p975"],
             1.0,
         )
+
+    def test_background_job_finishes_and_exposes_progress(self) -> None:
+        dataset = self._dataset_with_measurement()
+        job = submit_porosity_job(dataset["id"], blue_image_upload(), bootstrap=False)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            job = get_porosity_job(job["id"])
+            if job["status"] in {"done", "error"}:
+                break
+            time.sleep(0.01)
+        self.assertEqual(job["status"], "done", job.get("error"))
+        self.assertEqual(job["progress"], 100)
+        self.assertTrue(load_result(job["result_id"]))
 
 
 if __name__ == "__main__":
