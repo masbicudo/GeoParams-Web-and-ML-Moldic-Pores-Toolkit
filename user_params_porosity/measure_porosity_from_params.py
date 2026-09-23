@@ -563,9 +563,11 @@ def measure_image(
     scale_factor: float = 1.0,
     progress_callback: ProgressCallback | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], np.ndarray, np.ndarray]:
+    report_progress(progress_callback, 0.0, "Loading the uploaded image")
     image = cv2.imread(str(image_path))
     if image is None:
         raise ValueError(f"Could not load image: {image_path}")
+    report_progress(progress_callback, 0.03, "Image loaded")
 
     original_height, original_width = image.shape[:2]
     crop = find_crop_for_image(image_path, crop_metadata)
@@ -585,7 +587,9 @@ def measure_image(
             interpolation=cv2.INTER_AREA,
         )
 
+    report_progress(progress_callback, 0.06, "Converting the image to CMYK")
     img_cmyk = bgr_to_cmyk(image)
+    report_progress(progress_callback, 0.15, "Preparing parameter masks")
     height, width = image.shape[:2]
     image_area = height * width
 
@@ -595,7 +599,6 @@ def measure_image(
     valid_count = 0
 
     param_total = len(params_df)
-    report_progress(progress_callback, 0.0, "Preparing parameter masks")
     for position, (idx, row) in enumerate(params_df.iterrows(), start=1):
         c_min = int(row["clicked_x"])
         k_max = int(row["clicked_y"])
@@ -641,7 +644,7 @@ def measure_image(
             valid_count += 1
         report_progress(
             progress_callback,
-            position / param_total if param_total else 1.0,
+            0.15 + 0.85 * (position / param_total if param_total else 1.0),
             f"Applying parameter mask {position} of {param_total}",
         )
 
