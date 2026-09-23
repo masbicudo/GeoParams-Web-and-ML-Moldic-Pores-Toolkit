@@ -194,6 +194,15 @@ an optional, explicitly slower calculation. Analysis inputs and results are
 stored under the ignored host-mounted `geo_params_web/data/uploads/` folder,
 so recreating the Docker container does not erase them.
 
+Porosity jobs and results are listed in the calculator and persist under
+`geo_params_web/data/uploads/porosity_analyses/`. Each new analysis uses a
+SHA-256 identity derived from the image bytes, named dataset, and exact C/K
+parameter values. Repeated submissions can open the existing result or replace
+it at the same link. Jobs execute one at a time to avoid CPU and memory
+contention; queued jobs show that they are waiting for the processing slot.
+Completed selections can be exported as a flat CSV, and saved items can be
+deleted from the list.
+
 ### Local development
 
 1. Open Visual Studio Code from the `geo_params_web` folder.
