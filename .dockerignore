@@ -1,0 +1,16 @@
+.git
+**/.venv
+**/__pycache__
+**/*.pyc
+datasets
+ml_moldic_pores
+geo_params_web/.env
+geo_params_web/data
+geo_params_web/log
+geo_params_web/remote-static
+geo_params_web/static/imgs_sections/**/*.jpg
+geo_params_web/static/imgs_sections/**/*.jpeg
+geo_params_web/static/imgs_sections/**/*.png
+geo_params_web/static/output
+user_params_porosity/*
+!user_params_porosity/measure_porosity_from_params.py
