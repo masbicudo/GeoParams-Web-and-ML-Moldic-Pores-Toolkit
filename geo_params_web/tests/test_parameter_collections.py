@@ -79,6 +79,8 @@ class ParameterCollectionTests(unittest.TestCase):
         self.assertNotIn("Private name", serialized)
         self.assertNotIn("private@example.test", serialized)
         self.assertNotIn("person-name-in-file.jpg", serialized)
+        self.assertEqual(collection["short_id"], collection["id"][:12])
+        self.assertEqual(collection["detail"], "Collection complete")
         self.assertEqual(collection["summary"]["parameter_count"], 1)
         self.assertEqual(get_parameter_collection(collection["id"])["status"], "done")
 

@@ -249,7 +249,7 @@ def _legacy_records(excluded_outputs: set[tuple[str, int]]) -> list[dict]:
             continue
         modified = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()
         records.append(
-            {
+            _decorate({
                 "version": 0,
                 "id": _legacy_id(relative),
                 "session_id": session_id,
@@ -263,7 +263,7 @@ def _legacy_records(excluded_outputs: set[tuple[str, int]]) -> list[dict]:
                 "updated_at": modified,
                 "legacy": True,
                 "summary": _technical_summary(options),
-            }
+            })
         )
     return records
 
