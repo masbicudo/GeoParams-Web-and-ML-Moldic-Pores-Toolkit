@@ -30,6 +30,7 @@ from libs.porosity_jobs import (
     submit_porosity_job,
 )
 from libs.porosity_tool import analyses_root
+from libs.porosity_exports import build_results_csv
 from libs.upload_datasets import create_dataset
 
 
@@ -169,6 +170,11 @@ class PorosityToolTests(unittest.TestCase):
         recalculated = self._wait_for_job(job["id"])
         self.assertEqual(recalculated["status"], "done")
         self.assertEqual(recalculated["run_count"], 2)
+
+        csv_text = build_results_csv([job["id"]])
+        self.assertIn("analysis_id", csv_text.splitlines()[0])
+        self.assertIn("porosity_20p", csv_text.splitlines()[0])
+        self.assertIn(job["id"], csv_text)
 
         self.assertEqual(delete_porosity_jobs([job["id"]]), 1)
         self.assertFalse(any(item["id"] == job["id"] for item in list_porosity_jobs()))
