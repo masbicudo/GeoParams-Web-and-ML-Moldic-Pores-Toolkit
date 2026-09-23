@@ -18,7 +18,7 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import cv2
 import numpy as np
@@ -30,6 +30,16 @@ IMAGE_EXTENSIONS = ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff")
 DEFAULT_NULL_PORE_PIXEL_THRESHOLD = 1000
 DEFAULT_MIN_VALID_SAMPLE_FRACTION = 0.20
 DEFAULT_BOOTSTRAP_CHUNK_PIXELS = 250_000
+ProgressCallback = Callable[[float, str], None]
+
+
+def report_progress(
+    callback: ProgressCallback | None,
+    fraction: float,
+    message: str,
+) -> None:
+    if callback is not None:
+        callback(max(0.0, min(1.0, fraction)), message)
 
 
 def parse_args() -> argparse.Namespace:
@@ -403,6 +413,7 @@ def bootstrap_superposition_porosities(
     chunk_pixels: int,
     image_name: str,
     output_dir: Path,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, float]:
     if bootstrap_replicates < 0:
         raise ValueError("Bootstrap replicates must be zero or positive.")
@@ -434,6 +445,7 @@ def bootstrap_superposition_porosities(
     pore_pixel_counts = np.zeros(param_count, dtype=np.int64)
 
     chunk_pixels = min(chunk_pixels, area_pixels)
+    report_progress(progress_callback, 0.0, "Preparing bootstrap masks")
     for start in range(0, area_pixels, chunk_pixels):
         end = min(start + chunk_pixels, area_pixels)
         masks = (
@@ -442,6 +454,11 @@ def bootstrap_superposition_porosities(
             & (k_channel[start:end][None, :] <= k_maxs[:, None])
         )
         pore_pixel_counts += masks.sum(axis=1)
+        report_progress(
+            progress_callback,
+            0.20 * end / area_pixels,
+            "Evaluating masks for bootstrap",
+        )
 
     rng = np.random.default_rng(bootstrap_seed)
     sample_indices = rng.integers(
@@ -466,6 +483,7 @@ def bootstrap_superposition_porosities(
             valid_indices,
             minlength=param_count,
         ).astype(np.uint16)
+    report_progress(progress_callback, 0.25, "Preparing bootstrap resamples")
 
     active_replicates = np.flatnonzero(has_detectable_pores)
     for start in range(0, area_pixels, chunk_pixels):
@@ -482,6 +500,11 @@ def bootstrap_superposition_porosities(
                 counts,
                 minlength=max_valid_count + 1,
             )
+        report_progress(
+            progress_callback,
+            0.25 + 0.65 * end / area_pixels,
+            "Computing bootstrap resamples",
+        )
 
     by_threshold: dict[str, list[float]] = {
         threshold_column_name(threshold): []
@@ -498,6 +521,11 @@ def bootstrap_superposition_porosities(
             )
         for key, value in replicate_porosities.items():
             by_threshold[key].append(value)
+        report_progress(
+            progress_callback,
+            0.90 + 0.10 * (replicate_index + 1) / bootstrap_replicates,
+            "Summarizing bootstrap interval",
+        )
 
     result: dict[str, float] = {
         "bootstrap_replicates": bootstrap_replicates,
@@ -533,6 +561,7 @@ def measure_image(
     min_valid_sample_fraction: float = DEFAULT_MIN_VALID_SAMPLE_FRACTION,
     scale_label: str = "100%",
     scale_factor: float = 1.0,
+    progress_callback: ProgressCallback | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], np.ndarray, np.ndarray]:
     image = cv2.imread(str(image_path))
     if image is None:
@@ -565,7 +594,9 @@ def measure_image(
     per_param_rows: list[dict[str, Any]] = []
     valid_count = 0
 
-    for idx, row in params_df.iterrows():
+    param_total = len(params_df)
+    report_progress(progress_callback, 0.0, "Preparing parameter masks")
+    for position, (idx, row) in enumerate(params_df.iterrows(), start=1):
         c_min = int(row["clicked_x"])
         k_max = int(row["clicked_y"])
 
@@ -608,6 +639,11 @@ def measure_image(
         if valid_for_superposition:
             superposition_mean_image += binary_image
             valid_count += 1
+        report_progress(
+            progress_callback,
+            position / param_total if param_total else 1.0,
+            f"Applying parameter mask {position} of {param_total}",
+        )
 
     if len(params_df) > 0:
         raw_mean_image /= len(params_df)
