@@ -54,6 +54,11 @@
             <span class="small text-muted font-monospace" title="{{ job.id }}">
               {{ job.short_id }}…
             </span>
+            {% if job.created_at %}
+              <span class="small text-muted">
+                · {{ job.created_at[:19] | replace('T', ' ') }} UTC
+              </span>
+            {% endif %}
             {% if job.bootstrap %}
               <span class="badge text-bg-light">bootstrap</span>
             {% endif %}
