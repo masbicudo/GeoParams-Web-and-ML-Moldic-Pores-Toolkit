@@ -6,6 +6,7 @@ authors = [
     {name = "Miguel Angelo", email = "masbicudo@gmail.com"},
 ]
 dependencies = [
+    "matplotlib>=3.10.3",
     "numpy>=2.2.5",
     "opencv-python>=4.11.0.86",
     "pandas>=2.2.3",
