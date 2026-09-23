@@ -102,6 +102,32 @@ The cropped images are written to:
 data/output/generalization_test_thin_sections/cropped_inputs/
 ```
 
+## Post-Publication Porosity Plots by Experience
+
+These plots were added for a presentation after the article was published.
+They provide an additional view of the existing results and do not change the
+article method or its reported values.
+
+After running both default analyses, generate presentation-ready PDF boxplots
+from the individual parameter estimates:
+
+```bash
+pdm run python plot_porosity_by_experience.py
+```
+
+The command creates one plot per thin section and one grouped plot for each
+image set. For every thin section it automatically selects the highest
+available resolution. All figures share a fixed porosity axis from 0% to 100%,
+so their distributions can be compared directly.
+
+The plots intentionally include all raw individual parameter estimates,
+including near-zero estimates and values that are not used in the manuscript
+superposition. Generated PDFs are written to the ignored directory:
+
+```text
+plots/outputs/
+```
+
 ## Crop Metadata Format
 
 Crop metadata maps image filenames to rectangles:
