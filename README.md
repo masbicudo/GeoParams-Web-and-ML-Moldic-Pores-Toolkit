@@ -136,24 +136,37 @@ The data collection application is located in the `geo_params_web` project folde
 
 ### Docker (recommended)
 
-After placing the public images in `datasets/article_thin_sections/`, run:
+The guided launcher checks Docker and the public image dataset before starting.
+It explains how to satisfy a missing prerequisite, then lets you check again.
+It never installs software or changes system settings.
+
+On Linux or macOS, run from the repository root:
 
 ```bash
-cd geo_params_web
 ./run.sh
 ```
 
-The command builds the application image, prepares the local image cache, and
-starts the Flask data-collection app and Streamlit statistics app behind an
-Nginx reverse proxy:
+On Windows, double-click `run.bat`, or run it from a terminal:
+
+```bat
+run.bat
+```
+
+The launcher builds the tagged application image, prepares the local image
+cache, and starts the application behind an Nginx reverse proxy. It reports
+four short progress stages and prints the application URL when ready:
 
 - Data collection: <http://localhost:8181/geo-server/>
 - Statistics: <http://localhost:8181/geo-server/stats/>
 
-The paths match the deployed application layout. Keep the terminal open while
-using the applications. Press `Ctrl+C` or close the terminal to stop the
-servers. Detailed startup diagnostics are written to
-`geo_params_web/log/docker-run.log`.
+At the end, choose whether to leave the application running in the background
+or stop it. Detailed diagnostics are written to
+`geo_params_web/log/docker-run.log` without flooding the terminal.
+
+Use `remove-docker-app.sh` on Linux or macOS, or
+`remove-docker-app.bat` on Windows, to stop the app, remove its containers, or
+remove only images carrying this project's ownership labels. These scripts do
+not delete uploads, results, unrelated images, or the shared Nginx image.
 
 Set `GEO_PARAMS_PORT` before running the command to use a different host port.
 For non-local deployments, also set a strong `FLASK_SECRET_KEY`.

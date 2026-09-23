@@ -1,5 +1,11 @@
 FROM python:3.12-slim
 
+LABEL org.opencontainers.image.title="GeoParams Web" \
+      org.opencontainers.image.version="app-v2" \
+      org.opencontainers.image.source="https://github.com/masbicudo/GeoParams-Web-and-ML-Moldic-Pores-Toolkit" \
+      io.geoparams.project="geo-params-web" \
+      io.geoparams.managed-by="geo-params-launcher"
+
 ENV PDM_CHECK_UPDATE=false \
     PDM_USE_VENV=true \
     PYTHONUNBUFFERED=1
