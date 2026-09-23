@@ -114,3 +114,34 @@ body {
     height: 2rem;
     font-size: 1rem;
 }
+.help-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    padding: 0;
+    border: 1px solid #6c757d;
+    border-radius: 50%;
+    background: white;
+    color: #495057;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.help-hint:hover,
+.help-hint:focus-visible {
+    border-color: #0d6efd;
+    color: #0d6efd;
+    outline: none;
+}
+.threshold-legend-swatch {
+    display: inline-block;
+    width: 1.25rem;
+    height: 0.8rem;
+    margin-right: 0.35rem;
+    border: 1px solid #9ec5fe;
+    border-radius: 0.15rem;
+    background: #cfe2ff;
+    vertical-align: -0.05rem;
+}

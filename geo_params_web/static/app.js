@@ -1,3 +1,18 @@
+function initializeHelpTooltips() {
+    if (!window.bootstrap || !window.bootstrap.Tooltip) return;
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(element => {
+        window.bootstrap.Tooltip.getOrCreateInstance(element, {
+            trigger: 'hover focus',
+        });
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeHelpTooltips);
+} else {
+    initializeHelpTooltips();
+}
+window.addEventListener('load', initializeHelpTooltips);
 
 if (current_endpoint == "index")
 {

@@ -90,19 +90,40 @@
   <dd class="col-sm-7">{{ summary.width }} × {{ summary.height }} px</dd>
 </dl>
 
-<h3 class="h5">Normalized thresholds</h3>
+<h3 class="h5 d-flex align-items-center gap-2">
+  Normalized thresholds
+  <button type="button"
+          class="help-hint"
+          aria-label="Explain normalized superposition thresholds"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          data-bs-title="The threshold is applied to the normalized mean superposition mask; it is not a literal percentage of participants. Lower thresholds include pixels with weaker aggregate pore evidence and usually produce higher, more sensitive porosity estimates. Higher thresholds require stronger evidence and usually produce lower, more conservative estimates. The blue 20% row is the manuscript-compatible result.">?</button>
+</h3>
+<p class="small text-muted">
+  Lower thresholds are more inclusive; higher thresholds require stronger aggregate pore evidence.
+</p>
 <div class="table-responsive mb-4">
   <table class="table table-sm">
     <thead><tr><th>Superposition threshold</th><th>Porosity</th></tr></thead>
     <tbody>
       {% for item in result.threshold_results %}
       <tr class="{% if item.key == 'porosity_20p' %}table-primary{% endif %}">
-        <td>{{ '%.1f' | format(100 * item.threshold) }}%</td>
+        <td>
+          {{ '%.1f' | format(100 * item.threshold) }}%
+          {% if item.key == 'porosity_20p' %}
+          <span class="badge text-bg-primary ms-2">Article method</span>
+          {% endif %}
+        </td>
         <td>{{ '%.2f' | format(100 * item.value) }}%</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+</div>
+<div class="small text-muted mb-4">
+  <span class="threshold-legend-swatch" aria-hidden="true"></span>
+  The blue row is the 20% normalized-superposition threshold used for the
+  manuscript-compatible porosity estimate.
 </div>
 
 <h3 class="h5">Superposition mean mask</h3>
