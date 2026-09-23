@@ -179,6 +179,25 @@ directory from the host.
 The maximum upload request is 1024 MB by default. Set `MAX_UPLOAD_MB` before
 starting Docker to use a lower Flask limit.
 
+### Parameter collection workflows
+
+The parameter-entry tool opens on a collection list instead of immediately
+requesting participant information. Each collection represents the complete
+human-in-the-loop workflow: it can be waiting for user input, waiting for the
+shared processing slot, processing with measured progress, completed,
+discarded, or failed. Waiting for a person never reserves the processing slot.
+
+Workflow state is persisted under
+`geo_params_web/data/uploads/parameter_collections/`, while generated image
+artifacts remain under the host-mounted `geo_params_web/static/output/`
+directory. Earlier completed output records are also presented as read-only
+collection summaries. Completed and discarded collections cannot be reopened
+for editing.
+
+Collection lists and summaries intentionally omit participant names, contact
+details, dataset names, and image filenames. They use opaque collection IDs,
+timestamps, workflow state, and technical parameter summaries instead.
+
 ### Porosity calculator
 
 The application home page also provides a porosity calculator for new
@@ -198,8 +217,9 @@ Porosity jobs and results are listed in the calculator and persist under
 `geo_params_web/data/uploads/porosity_analyses/`. Each new analysis uses a
 SHA-256 identity derived from the image bytes, named dataset, and exact C/K
 parameter values. Repeated submissions can open the existing result or replace
-it at the same link. Jobs execute one at a time to avoid CPU and memory
-contention; queued jobs show that they are waiting for the processing slot.
+it at the same link. Automated stages across the application share one FIFO
+processing slot to avoid CPU and memory contention; queued work shows that it
+is waiting without blocking human-input stages.
 Completed selections can be exported as a flat CSV, and saved items can be
 deleted from the list.
 
