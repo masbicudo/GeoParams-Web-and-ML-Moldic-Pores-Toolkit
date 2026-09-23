@@ -68,7 +68,7 @@ if [ ! -d "../datasets/article_thin_sections" ]; then
     exit 1
 fi
 
-mkdir -p static/output static/imgs_sections log
+mkdir -p static/output static/imgs_sections data/uploads log
 : >"$log_file"
 
 run_step "[1/4] Building the application image" docker compose build

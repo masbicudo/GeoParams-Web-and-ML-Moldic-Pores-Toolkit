@@ -9,14 +9,36 @@
   }
 </style>
 
-<h2>Select a thin section and then a region of interest</h2>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h2>Select a thin section and then a region of interest</h2>
+    <p class="text-muted mb-0">Current dataset: <strong>{{ dataset_name }}</strong></p>
+  </div>
+  <a class="btn btn-outline-primary"
+     href="{{ url_for('datasets', session_id=session_id) }}">Upload or manage datasets</a>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a class="btn btn-sm {{ 'btn-primary' if current_dataset_id == 'builtin' else 'btn-outline-primary' }}"
+     href="{{ url_for('image_select', session_id=session_id, dataset_id='builtin') }}">
+    Publication thin sections
+  </a>
+  {% for dataset in datasets %}
+    <a class="btn btn-sm {{ 'btn-primary' if current_dataset_id == dataset.id else 'btn-outline-primary' }}"
+       href="{{ url_for('image_select', session_id=session_id, dataset_id=dataset.id) }}">
+      {{ dataset.name }}
+    </a>
+  {% endfor %}
+</div>
 
 <form method="POST">
+    <input type="hidden" name="dataset_id" value="{{ current_dataset_id }}">
     <div class="mb-3">
-      <select name="filename" id="filename">
-          {% for file in files %}
-              <option value="{{ file }}" {% if file == current_file %}selected{% endif %}>
-                  {{ file }}
+      <label class="form-label" for="image_id">Thin section</label>
+      <select class="form-select" name="image_id" id="image_id">
+          {% for image in images_available %}
+              <option value="{{ image.id }}" {% if image.id == current_image_id %}selected{% endif %}>
+                  {{ image.label }}{{ '' if image.mm_per_pixel else ' — pixel measurements only' }}
               </option>
           {% endfor %}
       </select>
@@ -64,7 +86,6 @@
 </form>
 
 <script>
-  const metadata = {{ metadata | tojson }};
-  const image_percentage = {{ image_percentage | tojson }};
+  const imagesAvailable = {{ images_available | tojson }};
 </script>
 {% endblock %}

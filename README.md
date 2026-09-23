@@ -158,6 +158,27 @@ servers. Detailed startup diagnostics are written to
 Set `GEO_PARAMS_PORT` before running the command to use a different host port.
 For non-local deployments, also set a strong `FLASK_SECRET_KEY`.
 
+### Custom thin-section datasets
+
+The `app-v2` application accepts named custom datasets containing JPEG, PNG,
+or TIFF thin-section images. Physical calibration is optional: users may mark
+both endpoints of an image scale bar and enter its length, or continue with
+pixel-only measurements.
+
+Uploaded originals, generated previews, and metadata are stored on the host in:
+
+```text
+geo_params_web/data/uploads/
+```
+
+This directory is ignored by Git and mounted into the application container.
+Rebuilding or replacing the Docker image therefore does not remove uploaded
+datasets. Deleting a dataset through the application permanently removes its
+directory from the host.
+
+The maximum upload request is 1024 MB by default. Set `MAX_UPLOAD_MB` before
+starting Docker to use a lower Flask limit.
+
 ### Local development
 
 1. Open Visual Studio Code from the `geo_params_web` folder.

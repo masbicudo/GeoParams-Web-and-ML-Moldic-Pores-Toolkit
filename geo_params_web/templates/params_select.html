@@ -102,8 +102,8 @@
     <script>
       const clickedPoints = {{ clicked_points | tojson }};
       let tile_shape = {{ tile_shape | tojson }};
-      const metadata = {{ metadata | tojson }};
       const filename = {{ filename | tojson }};
+      const mmPerPixel = {{ mm_per_pixel | tojson }};
       const counter = {{ counter | tojson }};
       const lr = { str: {
         processing: "{{ lr.str.processing }}",

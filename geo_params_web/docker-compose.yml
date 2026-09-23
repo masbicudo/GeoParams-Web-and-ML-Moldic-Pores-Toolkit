@@ -2,20 +2,22 @@ name: geo-params-web
 
 services:
   prepare:
-    image: geo-params-web:latest
+    image: ${GEO_PARAMS_IMAGE:-geo-params-web:latest}
     command: ["pdm", "run", "python", "prepare_web_images.py"]
     volumes:
-      - ../datasets:/workspace/datasets:ro
+      - ${GEO_PARAMS_DATASETS_DIR:-../datasets}:/workspace/datasets:ro
       - ./static/imgs_sections:/workspace/geo_params_web/static/imgs_sections
 
   app:
-    image: geo-params-web:latest
+    image: ${GEO_PARAMS_IMAGE:-geo-params-web:latest}
     build:
       context: .
       dockerfile: Dockerfile
     environment:
       FLASK_ENV: production
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-geo-params-local-development}
+      GEO_PARAMS_UPLOADS_DIR: /workspace/geo_params_web/data/uploads
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-1024}
     expose:
       - "5000"
       - "8501"
@@ -23,6 +25,7 @@ services:
     volumes:
       - ./static/imgs_sections:/workspace/geo_params_web/static/imgs_sections:ro
       - ./static/output:/workspace/geo_params_web/static/output
+      - ./data/uploads:/workspace/geo_params_web/data/uploads
       - ./log:/workspace/geo_params_web/log
     healthcheck:
       test:

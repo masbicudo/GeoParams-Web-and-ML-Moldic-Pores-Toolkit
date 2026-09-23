@@ -186,6 +186,7 @@ stitched_tiles.png
 /geo_params_web/static/output/
 /geo_params_web/session.json
 /geo_params_web/session.json.corrupted
+/geo_params_web/data/uploads/
 /geo_params_web/*sagelab*
 /ml_moldic_pores/data/classes.txt
 *.uncommitted

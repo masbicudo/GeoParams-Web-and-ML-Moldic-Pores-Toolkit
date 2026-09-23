@@ -1,0 +1,64 @@
+{% extends "base_form.html" %}
+
+{% block title %}Custom thin-section datasets{% endblock %}
+
+{% block content_1 %}
+<h2>Custom thin-section datasets</h2>
+<p>
+  Uploads are stored persistently on the host, outside the Docker image. They
+  remain available when containers are rebuilt or replaced.
+</p>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h3 class="h5">Create a dataset</h3>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label" for="name">Dataset name</label>
+        <input class="form-control" id="name" name="name" maxlength="120" required
+               placeholder="e.g. Carbonate thin sections - study 01">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="images">Thin-section images</label>
+        <input class="form-control" id="images" name="images" type="file" multiple required
+               accept=".jpg,.jpeg,.png,.tif,.tiff,image/jpeg,image/png,image/tiff">
+        <div class="form-text">
+          JPEG, PNG or TIFF. Total request limit: {{ max_upload_mb }} MB.
+        </div>
+      </div>
+      <button class="btn btn-primary" type="submit">Upload and create dataset</button>
+    </form>
+  </div>
+</div>
+
+<h3 class="h5">Saved datasets</h3>
+{% if datasets %}
+  <div class="list-group mb-4">
+    {% for dataset in datasets %}
+      <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+          <strong>{{ dataset.name }}</strong><br>
+          <small>{{ dataset.images | length }} image(s)</small>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-secondary btn-sm"
+             href="{{ url_for('dataset_detail', dataset_id=dataset.id, session_id=session_id) }}">
+            Review metadata
+          </a>
+          <a class="btn btn-success btn-sm"
+             href="{{ url_for('image_select', dataset_id=dataset.id, session_id=session_id) }}">
+            Use dataset
+          </a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-muted">No custom datasets have been uploaded yet.</p>
+{% endif %}
+
+<a class="btn btn-outline-primary"
+   href="{{ url_for('image_select', dataset_id='builtin', session_id=session_id) }}">
+  Back to publication thin sections
+</a>
+{% endblock %}

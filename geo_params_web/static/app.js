@@ -8,24 +8,26 @@ if (current_endpoint == "image_select")
 {
     const selectionInfo = document.getElementById("selectionInfo");
 
-    function fetchImageSz(name, percentage) {
-        fetch("/make_thin_section?name=" + name + "&percentage=" + percentage)
-            .then(response => response.json())
-            .then(data => {
-                const img = document.getElementById('main-img');
-                img.src = `/static/imgs_sections/${percentage}/${name}`
-            });
+    function selectedImage() {
+        const imageId = document.getElementById("image_id").value;
+        return imagesAvailable.find(item => item.id === imageId);
     }
 
-    document.getElementById("filename").addEventListener("change", function() {
-        const selectedFile = this.value;
-        fetchImageSz(selectedFile, image_percentage);
-    });
+    function showSelectedImage() {
+        const selected = selectedImage();
+        if (!selected) return;
+        document.getElementById('main-img').src = selected.preview_url;
+        for (const field of ["x", "y", "w", "h"]) {
+            document.getElementById(field).value = "0";
+        }
+        selectionBox.style.display = 'none';
+        selectionInfo.style.display = 'none';
+    }
+
+    document.getElementById("image_id").addEventListener("change", showSelectedImage);
 
     document.addEventListener("DOMContentLoaded", function () {
-        const select = document.getElementById("filename");
-        const selectedFile = select.value;
-        fetchImageSz(selectedFile, image_percentage);
+        showSelectedImage();
     });
 
     const image = document.getElementById('main-img');
@@ -33,18 +35,14 @@ if (current_endpoint == "image_select")
     let startX, startY;
     
     function moveInfoBox(x, y, w, h){
-        // selectionInfo.style.display = "block";
-        const rect = image.getBoundingClientRect();
         const margin = 10;
         const infoBoxWidth = selectionInfo.offsetWidth;
-        let infoLeft = x + w + margin + rect.left;
-        if (infoLeft + infoBoxWidth > window.innerWidth) {
-            infoLeft = x + rect.left - infoBoxWidth - margin;
+        let infoLeft = x + w + margin;
+        if (infoLeft + infoBoxWidth > image.clientWidth) {
+            infoLeft = x - infoBoxWidth - margin;
         }
-        selectionInfo.style.left = `${infoLeft}px`;
-        selectionInfo.style.top = `${y + rect.top}px`;
-        // selectionInfo.style.left = (x + w + 10 + rect.left) + 'px';
-        // selectionInfo.style.top = (y + rect.top) + 'px';
+        selectionInfo.style.left = `${Math.max(0, infoLeft)}px`;
+        selectionInfo.style.top = `${Math.max(0, y)}px`;
     }
 
     image.addEventListener('mousedown', (e) => {
@@ -85,15 +83,16 @@ if (current_endpoint == "image_select")
             selectionBox.style.width = w + 'px';
             selectionBox.style.height = h + 'px';
 
-            const filename = document.getElementById("filename").value;
-            ruler = metadata[filename].metrics.ruler;
-
-            const ratio = 4 * ruler.mm / ruler.px;
-            const px2mm = x => Math.round(x * ratio * 100)/100;
-            const px2mm_sq = x => Math.round(x * ratio * ratio * 100)/100;
-
-            selectionInfo.innerHTML = `${px2mm(Math.round(w * scaleX))}mm x ${px2mm(Math.round(h * scaleY))}mm — ${px2mm_sq(Math.round(w * h * scaleX * scaleY))} mm²`;
-            selectionInfo.innerHTML += `<br/>${(Math.round(w * scaleX))}px x ${(Math.round(h * scaleY))}px — ${area_px} px²`;
+            const widthPixels = Math.round(w * scaleX);
+            const heightPixels = Math.round(h * scaleY);
+            const selected = selectedImage();
+            selectionInfo.innerHTML = `${widthPixels}px x ${heightPixels}px — ${area_px} px²`;
+            if (selected && selected.mm_per_pixel) {
+                const ratio = selected.mm_per_pixel;
+                const px2mm = value => Math.round(value * ratio * 100)/100;
+                const px2mmSq = value => Math.round(value * ratio * ratio * 100)/100;
+                selectionInfo.innerHTML = `${px2mm(widthPixels)}mm x ${px2mm(heightPixels)}mm — ${px2mmSq(area_px)} mm²<br/>` + selectionInfo.innerHTML;
+            }
             moveInfoBox(x, y, w, h);
         }
 
@@ -336,10 +335,12 @@ if (current_endpoint == "params_select")
 
 
     function setSliderLabel() {
-        ruler = metadata[filename].metrics.ruler;
-        const ratio = 4 * ruler.mm / ruler.px;
-        const mm2 = (slider.value * ratio * ratio).toFixed(4);
-        sliderValueDisplay.textContent = slider.value + "px² = " + mm2 + "mm²";
+        if (mmPerPixel) {
+            const mm2 = (slider.value * mmPerPixel * mmPerPixel).toFixed(4);
+            sliderValueDisplay.textContent = slider.value + "px² = " + mm2 + "mm²";
+        } else {
+            sliderValueDisplay.textContent = slider.value + "px² (physical scale not provided)";
+        }
     }
     slider.addEventListener("input", function () {
         setSliderLabel();
@@ -392,4 +393,71 @@ if (current_endpoint == "params_select")
     function restart(reason) {
         restart_async(reason);
     }
+}
+
+if (current_endpoint == "dataset_detail")
+{
+    document.querySelectorAll(".calibration-card").forEach(card => {
+        const image = card.querySelector(".calibration-image");
+        const overlay = card.querySelector(".calibration-overlay");
+        const line = card.querySelector(".calibration-line");
+        const pointOne = card.querySelector(".point-one");
+        const pointTwo = card.querySelector(".point-two");
+        const distanceInput = card.querySelector(".pixel-distance");
+        const status = card.querySelector(".calibration-status");
+        let points = [];
+
+        function draw() {
+            const width = image.clientWidth;
+            const height = image.clientHeight;
+            overlay.setAttribute("viewBox", `0 0 ${width} ${height}`);
+            const elements = [pointOne, pointTwo];
+            elements.forEach((point, index) => {
+                const value = points[index];
+                point.style.display = value ? "block" : "none";
+                if (value) {
+                    point.setAttribute("cx", value.x);
+                    point.setAttribute("cy", value.y);
+                }
+            });
+            if (points.length === 2) {
+                line.style.display = "block";
+                line.setAttribute("x1", points[0].x);
+                line.setAttribute("y1", points[0].y);
+                line.setAttribute("x2", points[1].x);
+                line.setAttribute("y2", points[1].y);
+            } else {
+                line.style.display = "none";
+            }
+        }
+
+        image.addEventListener("click", event => {
+            const rect = image.getBoundingClientRect();
+            const point = {
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top,
+            };
+            if (points.length === 2) points = [];
+            points.push(point);
+            if (points.length === 2) {
+                const displayedDistance = Math.hypot(
+                    points[1].x - points[0].x,
+                    points[1].y - points[0].y,
+                );
+                const previewDistance = displayedDistance * image.naturalWidth / image.clientWidth;
+                distanceInput.value = previewDistance.toFixed(4);
+                status.textContent = `Marked scale bar: ${previewDistance.toFixed(1)} preview pixels. Enter its physical length and save.`;
+            } else {
+                distanceInput.value = "";
+                status.textContent = "Click the other endpoint of the scale bar.";
+            }
+            draw();
+        });
+        window.addEventListener("resize", () => {
+            points = [];
+            distanceInput.value = "";
+            draw();
+        });
+        draw();
+    });
 }

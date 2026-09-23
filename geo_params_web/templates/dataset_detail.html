@@ -1,0 +1,107 @@
+{% extends "base_form.html" %}
+
+{% block title %}{{ dataset.name }}{% endblock %}
+
+{% block content_1 %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h2>{{ dataset.name }}</h2>
+    <p class="text-muted mb-0">{{ dataset.images | length }} image(s)</p>
+  </div>
+  <a class="btn btn-success"
+     href="{{ url_for('image_select', dataset_id=dataset.id, session_id=session_id) }}">
+    Use this dataset
+  </a>
+</div>
+
+<div class="alert alert-info">
+  Physical calibration is optional. To calibrate, click both endpoints of a
+  scale bar, enter its printed length, and save. Images without calibration
+  remain usable with measurements displayed in pixels.
+</div>
+
+{% for image in dataset.images %}
+  <div class="card mb-4 calibration-card" data-image-id="{{ image.id }}">
+    <div class="card-body">
+      <h3 class="h5">{{ image.display_name }}</h3>
+      <p class="small text-muted">
+        Original file: {{ image.original_filename }} —
+        {{ image.width_px }} × {{ image.height_px }} px
+      </p>
+      <div class="calibration-image-wrap mb-3">
+        <img class="calibration-image img-fluid"
+             src="{{ url_for('custom_image_preview', dataset_id=dataset.id, image_id=image.id, session_id=session_id) }}"
+             alt="{{ image.display_name }}">
+        <svg class="calibration-overlay" aria-hidden="true">
+          <line class="calibration-line" x1="0" y1="0" x2="0" y2="0"></line>
+          <circle class="calibration-point point-one" cx="0" cy="0" r="5"></circle>
+          <circle class="calibration-point point-two" cx="0" cy="0" r="5"></circle>
+        </svg>
+      </div>
+
+      <form method="POST"
+            action="{{ url_for('dataset_image_metadata', dataset_id=dataset.id, image_id=image.id, session_id=session_id) }}">
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label">Image name</label>
+            <input class="form-control" name="display_name" maxlength="160" required
+                   value="{{ image.display_name }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Scale-bar length</label>
+            <input class="form-control physical-distance" name="physical_distance"
+                   type="number" min="0" step="any"
+                   value="{{ image.calibration.physical_distance if image.calibration else '' }}"
+                   placeholder="e.g. 500">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Unit</label>
+            <select class="form-select" name="unit">
+              <option value="">No scale</option>
+              {% for unit in ['um', 'mm', 'cm'] %}
+                <option value="{{ unit }}"
+                  {% if image.calibration and image.calibration.unit == unit %}selected{% endif %}>
+                  {{ 'µm' if unit == 'um' else unit }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-primary w-100" type="submit">Save</button>
+          </div>
+        </div>
+        <input class="pixel-distance" name="pixel_distance_preview" type="hidden"
+               value="{% if image.calibration %}{{ image.calibration.pixel_distance_original * image.preview_scale }}{% endif %}">
+        <div class="calibration-status form-text mt-2">
+          {% if image.calibration %}
+            Saved calibration: {{ '%.4f' | format(image.calibration.micrometers_per_pixel) }} µm/px.
+            Click twice to replace it, or clear the length and select “No scale” to remove it.
+          {% else %}
+            No physical calibration saved. Click twice on the image to mark a scale bar.
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+{% endfor %}
+
+<div class="card border-danger mb-4">
+  <div class="card-body">
+    <h3 class="h5 text-danger">Delete dataset</h3>
+    <p>This permanently removes the uploaded originals, previews, and metadata.</p>
+    <form method="POST" action="{{ url_for('dataset_delete', dataset_id=dataset.id, session_id=session_id) }}"
+          onsubmit="return confirm('Permanently delete this dataset?');">
+      <label class="form-label">
+        Type <strong>{{ dataset.name }}</strong> to confirm
+      </label>
+      <div class="input-group">
+        <input class="form-control" name="confirmation" required autocomplete="off">
+        <button class="btn btn-outline-danger" type="submit">Delete permanently</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<a class="btn btn-outline-secondary"
+   href="{{ url_for('datasets', session_id=session_id) }}">Back to datasets</a>
+{% endblock %}

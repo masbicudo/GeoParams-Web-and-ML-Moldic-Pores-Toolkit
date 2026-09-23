@@ -16,12 +16,23 @@ from libs.web_helpers import setup_progress, progress_step, check_timeout
 import threading
 import json
 import localizable_resources as lr
+from libs.upload_datasets import (
+    DatasetError,
+    create_dataset,
+    delete_dataset,
+    find_image,
+    list_datasets,
+    load_dataset,
+    preview_path,
+    update_image_metadata,
+)
 
 from dotenv import load_dotenv
 load_dotenv(".env", override=False)
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_UPLOAD_MB", "1024")) * 1024 * 1024
 # app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 if not app.secret_key:
@@ -357,14 +368,12 @@ def params_select(session_id):
         priority = session.setdefault("options", {}).setdefault("params_select.priority", "none")
         log(session_id, f"request.method = {request.method}")
         if request.method == 'GET':
-            with open(f"static/imgs_sections/metadata.json") as fp:
-                metadata = json.load(fp)
             return render_template('params_select.html', session_id=session_id,
                                 min_pore_size=session_min_pore_size,
                                 clicked_points=points,
                                 tile_shape=tile_shape,
-                                metadata=metadata,
                                 filename=session.get("options", {})["image_select.filename"],
+                                mm_per_pixel=session.get("options", {}).get("image_select.mm_per_pixel"),
                                 counter=session["counter"],
                                 priority=priority,
                                 lr=lr,
@@ -452,36 +461,193 @@ def getImageFiles():
                 and (f.lower().endswith('.jpg') or f.lower().endswith('.jpeg'))]
     return files
 
+
+def builtin_image_choices() -> list[dict]:
+    files = getImageFiles()
+    with open("static/imgs_sections/metadata.json", encoding="utf-8") as fp:
+        metadata = json.load(fp)
+    choices = []
+    for filename in files:
+        ruler = metadata.get(filename, {}).get("metrics", {}).get("ruler")
+        mm_per_pixel = None
+        if ruler and ruler.get("px") and ruler.get("mm"):
+            # Preserve the conversion used by the published application for
+            # its 12.5% processing images.
+            mm_per_pixel = 4.0 * float(ruler["mm"]) / float(ruler["px"])
+        choices.append(
+            {
+                "id": filename,
+                "label": filename,
+                "preview_url": url_for(
+                    "static", filename=f"imgs_sections/{IMAGE_SCALE}/{filename}"
+                ),
+                "mm_per_pixel": mm_per_pixel,
+            }
+        )
+    return choices
+
+
+def custom_image_choices(dataset: dict, session_id: str) -> list[dict]:
+    choices = []
+    for image in dataset["images"]:
+        calibration = image.get("calibration")
+        mm_per_pixel = None
+        if calibration:
+            original_um_per_pixel = calibration.get("micrometers_per_pixel")
+            preview_scale = image.get("preview_scale")
+            if original_um_per_pixel and preview_scale:
+                mm_per_pixel = float(original_um_per_pixel) / float(preview_scale) / 1000.0
+        choices.append(
+            {
+                "id": image["id"],
+                "label": image.get("display_name") or image["original_filename"],
+                "preview_url": url_for(
+                    "custom_image_preview",
+                    dataset_id=dataset["id"],
+                    image_id=image["id"],
+                    session_id=session_id,
+                ),
+                "mm_per_pixel": mm_per_pixel,
+            }
+        )
+    return choices
+
+
+@app.route('/datasets', methods=['GET', 'POST'])
+@ensure_session
+def datasets(session_id):
+    if request.method == 'POST':
+        try:
+            dataset = create_dataset(
+                request.form.get("name", ""),
+                request.files.getlist("images"),
+            )
+        except DatasetError as exc:
+            flash(str(exc), 'danger')
+            return redirect(url_for("datasets", session_id=session_id))
+        flash(f"Dataset '{dataset['name']}' created.", 'success')
+        return redirect(
+            url_for("dataset_detail", dataset_id=dataset["id"], session_id=session_id)
+        )
+    return render_template(
+        'datasets.html',
+        session_id=session_id,
+        datasets=list_datasets(),
+        max_upload_mb=app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024),
+    )
+
+
+@app.route('/datasets/<dataset_id>')
+@ensure_session
+def dataset_detail(dataset_id, session_id):
+    try:
+        dataset = load_dataset(dataset_id)
+    except DatasetError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for("datasets", session_id=session_id))
+    return render_template(
+        'dataset_detail.html', dataset=dataset, session_id=session_id
+    )
+
+
+@app.route('/datasets/<dataset_id>/images/<image_id>/metadata', methods=['POST'])
+@ensure_session
+def dataset_image_metadata(dataset_id, image_id, session_id):
+    try:
+        pixel_distance = request.form.get("pixel_distance_preview", "").strip()
+        physical_distance = request.form.get("physical_distance", "").strip()
+        unit = request.form.get("unit", "").strip() or None
+        update_image_metadata(
+            dataset_id,
+            image_id,
+            request.form.get("display_name", ""),
+            float(pixel_distance) if pixel_distance else None,
+            float(physical_distance) if physical_distance else None,
+            unit,
+        )
+        flash("Image metadata saved.", 'success')
+    except (DatasetError, ValueError) as exc:
+        flash(str(exc), 'danger')
+    return redirect(
+        url_for("dataset_detail", dataset_id=dataset_id, session_id=session_id)
+    )
+
+
+@app.route('/datasets/<dataset_id>/delete', methods=['POST'])
+@ensure_session
+def dataset_delete(dataset_id, session_id):
+    try:
+        dataset = load_dataset(dataset_id)
+        confirmation = request.form.get("confirmation", "")
+        if confirmation != dataset["name"]:
+            raise DatasetError("Type the dataset name exactly to confirm deletion.")
+        delete_dataset(dataset_id)
+        session = get_session(session_id)
+        if session and session.get("options", {}).get("image_select.dataset_id") == dataset_id:
+            session["options"]["image_select.dataset_id"] = "builtin"
+        flash(f"Dataset '{dataset['name']}' deleted.", 'success')
+    except DatasetError as exc:
+        flash(str(exc), 'danger')
+    return redirect(url_for("datasets", session_id=session_id))
+
+
+@app.route('/datasets/<dataset_id>/previews/<image_id>')
+@ensure_session
+def custom_image_preview(dataset_id, image_id, session_id):
+    try:
+        dataset = load_dataset(dataset_id)
+        image = find_image(dataset, image_id)
+        return send_file(preview_path(dataset_id, image), mimetype="image/jpeg")
+    except DatasetError as exc:
+        return str(exc), 404
+
 @app.route('/image_select', methods=['GET', 'POST'])
 @ensure_session
 def image_select(session_id):
     if request.method == 'GET':
-        files = getImageFiles()
-        if not files:
+        session = get_session(session_id)
+        if session is None:
+            raise ValueError(f"Session {session_id} not found")
+        options = session.setdefault("options", {})
+        requested_dataset_id = request.args.get("dataset_id")
+        current_dataset_id = requested_dataset_id or options.get(
+            "image_select.dataset_id", "builtin"
+        )
+        dataset = None
+        try:
+            if current_dataset_id == "builtin":
+                images_available = builtin_image_choices()
+                dataset_name = "Publication thin sections"
+            else:
+                dataset = load_dataset(current_dataset_id)
+                images_available = custom_image_choices(dataset, session_id)
+                dataset_name = dataset["name"]
+        except DatasetError as exc:
+            flash(str(exc), 'danger')
+            current_dataset_id = "builtin"
+            images_available = builtin_image_choices()
+            dataset_name = "Publication thin sections"
+        options["image_select.dataset_id"] = current_dataset_id
+
+        if not images_available:
             return (
-                "No processed images were found. "
-                "Please generate the reduced images by running "
-                "`pdm run python prepare_web_images.py` before starting the "
-                "application. "
-                "See README.md for setup instructions.",
+                "No processed images were found in the selected dataset.",
                 400,
             )
 
-        filename = request.form.get('filename', files[0])
-        x = request.form.get('x', "0")
-        y = request.form.get('y', "0")
-        w = request.form.get('w', "0")
-        h = request.form.get('h', "0")
-        with open(f"static/imgs_sections/metadata.json") as fp:
-            metadata = json.load(fp)
+        image_id = options.get("image_select.image_id", images_available[0]["id"])
+        if image_id not in {item["id"] for item in images_available}:
+            image_id = images_available[0]["id"]
         return render_template('image_select.html', session_id=session_id,
-                               files=files, current_file=filename,
-                               metadata=metadata,
-                               area_x=x,
-                               area_y=y,
-                               area_w=w,
-                               area_h=h,
-                               image_percentage=IMAGE_SCALE,
+                               images_available=images_available,
+                               current_image_id=image_id,
+                               current_dataset_id=current_dataset_id,
+                               dataset_name=dataset_name,
+                               datasets=list_datasets(),
+                               area_x="0",
+                               area_y="0",
+                               area_w="0",
+                               area_h="0",
                                )
     elif request.method == 'POST':
         session = get_session(session_id)
@@ -493,30 +659,42 @@ def image_select(session_id):
         session.get("options", {}).pop("initial_image_setup.tile_shape", None)
         session.get("options", {}).pop("params_select.clicked_points", None)
 
-        filename = request.form["filename"] # e.g., "image.jpg"
+        dataset_id = request.form.get("dataset_id", "builtin")
+        image_id = request.form["image_id"]
         x = int(request.form["x"])
         y = int(request.form["y"])
         w = int(request.form["w"])
         h = int(request.form["h"])
 
-        session.setdefault("options", {})["image_select.filename"] = filename
+        if dataset_id == "builtin":
+            choices = builtin_image_choices()
+            selected = next((item for item in choices if item["id"] == image_id), None)
+            if selected is None:
+                return "Image not found", 404
+            input_path = f"static/imgs_sections/{IMAGE_SCALE}/{image_id}"
+        else:
+            try:
+                dataset = load_dataset(dataset_id)
+                image_record = find_image(dataset, image_id)
+                selected = next(
+                    item for item in custom_image_choices(dataset, session_id) if item["id"] == image_id
+                )
+                input_path = str(preview_path(dataset_id, image_record))
+            except (DatasetError, StopIteration):
+                return "Image not found", 404
 
-        if not filename or h == 0 or w == 0:
-            with open(f"static/imgs_sections/metadata.json") as fp:
-                metadata = json.load(fp)
-            files = getImageFiles()
-            return render_template('image_select.html', session_id=session_id,
-                            files=files, current_file=filename,
-                            metadata=metadata,
-                            area_x=x,
-                            area_y=y,
-                            area_w=w,
-                            area_h=h,
-                            image_percentage=IMAGE_SCALE,)
+        options = session.setdefault("options", {})
+        options["image_select.dataset_id"] = dataset_id
+        options["image_select.image_id"] = image_id
+        options["image_select.filename"] = selected["label"]
+        options["image_select.mm_per_pixel"] = selected["mm_per_pixel"]
 
-        # Paths
-        sz = f"{IMAGE_SCALE}"
-        input_path = f"static/imgs_sections/{sz}/{filename}"
+        if h == 0 or w == 0:
+            flash("Select a region of interest before continuing.", "danger")
+            return redirect(
+                url_for("image_select", session_id=session_id, dataset_id=dataset_id)
+            )
+
         output_path = f"static/output/{session_id}/{session['counter']}/cropped.jpg"
 
         # Load and crop
