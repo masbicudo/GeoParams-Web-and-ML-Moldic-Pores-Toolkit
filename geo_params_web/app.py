@@ -26,6 +26,13 @@ from libs.upload_datasets import (
     preview_path,
     update_image_metadata,
 )
+from libs.porosity_tool import (
+    PorosityToolError,
+    analyze_upload,
+    load_result,
+    parameter_sets,
+    result_image_path,
+)
 
 from dotenv import load_dotenv
 load_dotenv(".env", override=False)
@@ -313,6 +320,56 @@ def index(session_id):
 @app.route('/about-data')
 def about_data():
     return render_template('about_data.html')
+
+
+@app.route('/porosity', methods=['GET', 'POST'])
+def porosity_calculator():
+    session_id = request.args.get('session_id')
+    if request.method == 'GET':
+        return render_template(
+            'porosity.html',
+            session_id=session_id,
+            parameter_sets=parameter_sets(),
+            result=None,
+        )
+
+    try:
+        result = analyze_upload(
+            request.form.get('dataset_id', ''),
+            request.files.get('image'),
+            bootstrap=request.form.get('bootstrap') == 'yes',
+        )
+    except (PorosityToolError, DatasetError, OSError, ValueError) as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('porosity_calculator', session_id=session_id))
+
+    return redirect(
+        url_for('porosity_result', run_id=result['id'], session_id=session_id)
+    )
+
+
+@app.route('/porosity/results/<run_id>')
+def porosity_result(run_id):
+    session_id = request.args.get('session_id')
+    try:
+        result = load_result(run_id)
+    except PorosityToolError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('porosity_calculator', session_id=session_id))
+    return render_template(
+        'porosity.html',
+        session_id=session_id,
+        parameter_sets=parameter_sets(),
+        result=result,
+    )
+
+
+@app.route('/porosity/results/<run_id>/images/<kind>')
+def porosity_result_image(run_id, kind):
+    try:
+        return send_file(result_image_path(run_id, kind))
+    except PorosityToolError:
+        return "Analysis image not found", 404
 
 
 @app.route('/user_id', methods=['GET'])

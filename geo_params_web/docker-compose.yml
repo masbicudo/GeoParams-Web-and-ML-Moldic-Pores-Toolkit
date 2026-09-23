@@ -11,13 +11,14 @@ services:
   app:
     image: ${GEO_PARAMS_IMAGE:-geo-params-web:latest}
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: geo_params_web/Dockerfile
     environment:
       FLASK_ENV: production
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-geo-params-local-development}
       GEO_PARAMS_UPLOADS_DIR: /workspace/geo_params_web/data/uploads
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-1024}
+      POROSITY_BOOTSTRAP_REPLICATES: ${POROSITY_BOOTSTRAP_REPLICATES:-200}
     expose:
       - "5000"
       - "8501"

@@ -88,3 +88,25 @@ body {
     stroke: #ff2d2d;
     stroke-width: 3;
 }
+.porosity-slow-option {
+    padding: 1rem 1rem 1rem 2.5rem;
+    border: 1px solid #f0c36d;
+    border-radius: 0.5rem;
+    background: #fff8e5;
+}
+.porosity-result-card {
+    padding: 1.25rem;
+    border: 1px solid #9ec5fe;
+    border-radius: 0.5rem;
+    background: #e7f1ff;
+}
+.porosity-value {
+    color: #084298;
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+.porosity-mask {
+    border: 1px solid #ced4da;
+    background: #111;
+}
