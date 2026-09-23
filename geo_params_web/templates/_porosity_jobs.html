@@ -18,7 +18,10 @@
     <table class="table table-sm align-middle porosity-jobs-table">
       <thead>
         <tr>
-          <th scope="col"><span class="visually-hidden">Select</span></th>
+          <th scope="col">
+            <input class="form-check-input" type="checkbox" data-select-all
+                   aria-label="Select all available analyses">
+          </th>
           <th scope="col">Status</th>
           <th scope="col">Image and dataset</th>
           <th scope="col">Result</th>
@@ -30,6 +33,7 @@
         <tr>
           <td>
             <input class="form-check-input" type="checkbox" name="job_ids"
+                   data-select-item
                    value="{{ job.id }}" aria-label="Select {{ job.original_filename }}"
                    {% if job.status == 'running' %}disabled{% endif %}>
           </td>

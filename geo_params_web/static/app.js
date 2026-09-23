@@ -14,6 +14,42 @@ if (document.readyState === 'loading') {
 }
 window.addEventListener('load', initializeHelpTooltips);
 
+function initializeSelectAllControls() {
+    document.querySelectorAll('[data-select-all]').forEach(selectAll => {
+        const form = selectAll.closest('form');
+        if (!form || selectAll.dataset.initialized === 'true') return;
+        const items = Array.from(form.querySelectorAll('[data-select-item]'));
+
+        function enabledItems() {
+            return items.filter(item => !item.disabled);
+        }
+
+        function updateSelectAll() {
+            const enabled = enabledItems();
+            const selected = enabled.filter(item => item.checked).length;
+            selectAll.checked = enabled.length > 0 && selected === enabled.length;
+            selectAll.indeterminate = selected > 0 && selected < enabled.length;
+            selectAll.disabled = enabled.length === 0;
+        }
+
+        selectAll.addEventListener('change', () => {
+            enabledItems().forEach(item => {
+                item.checked = selectAll.checked;
+            });
+            updateSelectAll();
+        });
+        items.forEach(item => item.addEventListener('change', updateSelectAll));
+        selectAll.dataset.initialized = 'true';
+        updateSelectAll();
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeSelectAllControls);
+} else {
+    initializeSelectAllControls();
+}
+
 if (current_endpoint == "index")
 {
 
