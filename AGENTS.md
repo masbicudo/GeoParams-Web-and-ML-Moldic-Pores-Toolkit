@@ -52,6 +52,20 @@ Guidance for coding agents working in this repository.
 - Show active flows from all tools in the global helper.
 - Persist job state and results in the mounted data directory.
 
+## Scripts
+
+- Prefer POSIX shell and `#!/bin/sh`; document required Bash features.
+- Keep `.sh` files LF-terminated and executable.
+- Support Git Bash, Linux, and macOS; avoid platform-only flags.
+- Check dependencies with `command -v`; never scan whole disks.
+- Never install host tools; explain missing tools and allow a retry.
+- Support both `docker compose` and `docker-compose`.
+- Keep Windows launcher behavior aligned with POSIX launchers.
+- Remove Docker resources only when both project labels match.
+- Run ShellCheck, shfmt, Bash, and Dash after shell changes.
+- Run mocked flows in Git Bash, WSL, and macOS CI.
+- Smoke-test real Docker flows when the local platform permits it.
+
 ## Paths and Commands
 
 - Resolve script paths from the subproject root or `Path(__file__)`.
