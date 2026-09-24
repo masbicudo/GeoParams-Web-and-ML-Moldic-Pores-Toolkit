@@ -12,6 +12,10 @@ This project analyzes how geologists parameterize and interpret petrographic thi
 > [`publication-cageo-2026`](https://github.com/masbicudo/GeoParams-Web-and-ML-Moldic-Pores-Toolkit/tree/publication-cageo-2026)
 > tag.
 
+> **Developing this project?** Read [`AGENTS.md`](AGENTS.md) before making
+> changes. It documents the branch, privacy, data, script, and testing rules
+> followed by human developers and coding agents.
+
 ## Requirements
 
 - PDM (Python package manager)

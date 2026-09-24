@@ -1,6 +1,13 @@
 # AGENTS.md
 
-Guidance for coding agents working in this repository.
+## About This File
+
+- Human developers and coding agents MUST read and follow this file.
+- This section MUST remain the first section in this file.
+- Interpret MUST, SHALL, SHOULD, and MAY per RFC 2119 and RFC 8174.
+- Rules SHOULD fit within 80 characters; rare exceptions MUST aid clarity.
+- Rules SHOULD remain concise, specific, and nonredundant.
+- Order sections and their rules by relevance to human developers.
 
 ## Branches
 
@@ -15,13 +22,12 @@ Guidance for coding agents working in this repository.
 - Keep the branch READMEs distinct and link them to each other.
 - Explain in `main` that app development continues on `app-v2`.
 
-## Repository
+## Privacy
 
-- Keep this public repository reproducible and easy to inspect.
-- `geo_params_web` contains the collection and statistics app.
-- `ml_moldic_pores` contains ML notebooks and models.
-- `user_params_porosity` measures porosity from user parameters.
-- Run each subproject from its own PDM environment and directory.
+- Only personal data is sensitive by default.
+- Do not expose personal data in public lists, summaries, or examples.
+- Do not use personal names in commit messages.
+- Dataset names and filenames may appear in lists and summaries.
 
 ## Data
 
@@ -32,25 +38,13 @@ Guidance for coding agents working in this repository.
 - Never rely on a Docker container layer for persistent user data.
 - Treat generated outputs as caches, not as source datasets.
 
-## Privacy
+## Repository
 
-- Only personal data is sensitive by default.
-- Do not expose personal data in public lists, summaries, or examples.
-- Do not use personal names in commit messages.
-- Dataset names and filenames may appear in lists and summaries.
-
-## Workflows
-
-- A tool flow may include human steps and automated jobs.
-- Human input must not hold an automated processing slot.
-- Show automated progress as part of its parent tool flow.
-- Serialize jobs that compete for the same processing resource.
-- Mark flows waiting for user input without blocking queued jobs.
-- Make completed parameter collections read-only.
-- Open completed collections on a summary page.
-- Put flow lists on tool landing pages, not on result pages.
-- Show active flows from all tools in the global helper.
-- Persist job state and results in the mounted data directory.
+- Keep this public repository reproducible and easy to inspect.
+- `geo_params_web` contains the collection and statistics app.
+- `ml_moldic_pores` contains ML notebooks and models.
+- `user_params_porosity` measures porosity from user parameters.
+- Run each subproject from its own PDM environment and directory.
 
 ## Scripts
 
@@ -73,3 +67,16 @@ Guidance for coding agents working in this repository.
 - Keep README entry commands short and safe to copy.
 - Put long configurable commands in an advanced section.
 - Report missing paths and expected layouts without noisy tracebacks.
+
+## Workflows
+
+- A tool flow may include human steps and automated jobs.
+- Human input must not hold an automated processing slot.
+- Show automated progress as part of its parent tool flow.
+- Serialize jobs that compete for the same processing resource.
+- Mark flows waiting for user input without blocking queued jobs.
+- Make completed parameter collections read-only.
+- Open completed collections on a summary page.
+- Put flow lists on tool landing pages, not on result pages.
+- Show active flows from all tools in the global helper.
+- Persist job state and results in the mounted data directory.
