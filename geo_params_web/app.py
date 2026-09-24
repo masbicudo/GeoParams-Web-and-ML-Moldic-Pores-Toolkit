@@ -139,6 +139,35 @@ def _collection_continue_url(collection: dict) -> str | None:
     return url_for(endpoint, session_id=collection["session_id"])
 
 
+def _reconcile_collection_processing(collection: dict, session: dict) -> dict:
+    """Repair a persisted workflow record from its automated task state."""
+    if collection.get("status") not in {"queued", "running"}:
+        return collection
+    task = session.get("tasks", {}).get("initial_image_setup")
+    if not task:
+        return collection
+    if task.get("state") == "Done":
+        return update_parameter_collection(
+            collection["id"],
+            session=session,
+            status="awaiting_input",
+            stage="parameter_selection",
+            progress=100,
+            message="Ready for parameter selection",
+            error=None,
+        )
+    if task.get("state") == "Error":
+        return update_parameter_collection(
+            collection["id"],
+            session=session,
+            status="error",
+            stage="error",
+            message="The automated processing step failed",
+            error=task.get("error") or "The automated processing step failed.",
+        )
+    return collection
+
+
 def _editable_collection_or_redirect(session_id: str):
     collection, session = _collection_for_session(session_id)
     if collection is None or session is None:
@@ -279,16 +308,20 @@ def task_executor(session_id: str, task_name: str,
             not_alive = task["alive_tag"] is None
             if (not_alive):
                 log(session_id, f"Flags: (not_alive={not_alive})")
-                thread_args = (session_id, count_timeouts)
+                launch_token = ProcessToken("Queued")
+                task["alive_tag"] = launch_token
+                thread_args = (session_id, count_timeouts, launch_token)
                 args_str = args_dict_to_str(thread_args)
                 log(session_id, f"Starting task thread {task_name} with {args_str}")
                 function_ref = globals()[task_name]
                 def task_thread_function():
                     try:
-                        function_ref(session_id, count_timeouts)
+                        function_ref(*thread_args)
                     except Exception as exc:
                         log(session_id, f"Task {task_name} failed: {exc}")
                         with global_lock:
+                            if task.get("alive_tag") is not launch_token:
+                                return
                             set_task_error(task, "The automated processing step failed.")
                         try:
                             _sync_collection(
@@ -304,11 +337,29 @@ def task_executor(session_id: str, task_name: str,
                 thread.start()
 
 initial_image_setup_lock = threading.Lock()
-def initial_image_setup(session_id, count_timeouts: int = 0):
+def initial_image_setup(
+    session_id,
+    count_timeouts: int = 0,
+    launch_token: ProcessToken | None = None,
+):
     if count_timeouts > 3:
         raise ValueError("Too many timeouts, aborting initial image setup.")
 
+    def is_current_task() -> bool:
+        session = get_session(session_id)
+        if session is None:
+            return False
+        with global_lock:
+            task = session.get("tasks", {}).get("initial_image_setup")
+            return bool(
+                task
+                and task.get("state") == "Requested"
+                and task.get("alive_tag") is launch_token
+            )
+
     def report_wait(ahead: int):
+        if not is_current_task():
+            return
         _sync_collection(
             session_id,
             status="queued",
@@ -322,6 +373,8 @@ def initial_image_setup(session_id, count_timeouts: int = 0):
             error=None,
         )
 
+    if not is_current_task():
+        return
     _sync_collection(
         session_id,
         status="queued",
@@ -331,6 +384,8 @@ def initial_image_setup(session_id, count_timeouts: int = 0):
         error=None,
     )
     with processing_slot(f"parameter-collection:{session_id}", on_wait=report_wait):
+        if not is_current_task():
+            return
         _sync_collection(
             session_id,
             status="running",
@@ -339,10 +394,14 @@ def initial_image_setup(session_id, count_timeouts: int = 0):
             message="Preparing parameter space",
             error=None,
         )
-        _initial_image_setup_work(session_id, count_timeouts)
+        _initial_image_setup_work(session_id, count_timeouts, launch_token)
 
 
-def _initial_image_setup_work(session_id, count_timeouts: int = 0):
+def _initial_image_setup_work(
+    session_id,
+    count_timeouts: int = 0,
+    launch_token: ProcessToken | None = None,
+):
     
     session = get_session(session_id)
 
@@ -354,7 +413,10 @@ def _initial_image_setup_work(session_id, count_timeouts: int = 0):
         if task is None:
             raise ValueError(f"Task 'initial_image_setup' not found in session {session_id}")
         
-        if task["state"] != "Requested":
+        if (
+            task["state"] != "Requested"
+            or task.get("alive_tag") is not launch_token
+        ):
             log(session_id, "Task 'initial_image_setup' is finished already, skipping.")
             return
         
@@ -366,7 +428,9 @@ def _initial_image_setup_work(session_id, count_timeouts: int = 0):
         
         session["options"]["initial_image_setup.min_pore_size"] = thresh
 
-        task["alive_tag"] = process_token = ProcessToken()
+        process_token = launch_token
+        if process_token is None:
+            raise RuntimeError("The processing task has no launch token.")
         process_token.state = "Running"
 
 
@@ -559,8 +623,14 @@ def parameter_collection_status(job_id):
         collection = get_parameter_collection(job_id)
         if not collection.get("legacy") and collection.get("status") in {"queued", "running"}:
             session = _restore_collection_session(collection)
+            collection = _reconcile_collection_processing(collection, session)
             task = session.get("tasks", {}).get("initial_image_setup")
-            if task and task.get("state") == "Requested" and task.get("alive_tag") is None:
+            if (
+                collection.get("status") in {"queued", "running"}
+                and task
+                and task.get("state") == "Requested"
+                and task.get("alive_tag") is None
+            ):
                 task_executor(collection["session_id"], "initial_image_setup", 0)
                 collection = get_parameter_collection(job_id)
     except ParameterCollectionError as exc:

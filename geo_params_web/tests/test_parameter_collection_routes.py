@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -93,6 +94,64 @@ class ParameterCollectionRouteTests(unittest.TestCase):
         self.assertIn(collection["short_id"].encode(), overview.data)
         self.assertIn(b"Input needed", overview.data)
         self.assertNotIn(b"window.setTimeout", overview.data)
+
+    def test_status_repairs_collection_after_processing_finished(self) -> None:
+        collection, session_id = self._start_collection()
+        session = get_session(session_id)
+        session["tasks"] = {
+            "initial_image_setup": {
+                "state": "Done",
+                "result": {"tile_shape": [10, 12]},
+                "alive_tag": None,
+                "cache": None,
+            }
+        }
+        update_parameter_collection(
+            collection["id"],
+            session=session,
+            status="running",
+            stage="image_processing",
+            progress=0,
+            message="Preparing parameter space",
+        )
+
+        response = self.client.get(
+            f"/parameter-collections/{collection['id']}/status"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["status"], "awaiting_input")
+        self.assertEqual(payload["stage"], "parameter_selection")
+        self.assertEqual(payload["progress"], 100)
+        self.assertIn("/params_select", payload["continue_url"])
+
+    def test_task_executor_reserves_launch_before_thread_starts(self) -> None:
+        collection, session_id = self._start_collection()
+        started = threading.Event()
+        release = threading.Event()
+        finished = threading.Event()
+        calls = []
+
+        def delayed_task(_session_id, _count_timeouts, _launch_token):
+            calls.append(_session_id)
+            started.set()
+            release.wait(timeout=2)
+            finished.set()
+
+        with patch.object(web_app, "initial_image_setup", delayed_task):
+            web_app.task_executor(
+                session_id,
+                "initial_image_setup",
+                arguments=[480],
+            )
+            self.assertTrue(started.wait(timeout=2))
+            web_app.task_executor(session_id, "initial_image_setup")
+            release.set()
+            self.assertTrue(finished.wait(timeout=2))
+
+        self.assertEqual(calls, [session_id])
+        self.assertIsNotNone(collection)
 
 
 if __name__ == "__main__":
