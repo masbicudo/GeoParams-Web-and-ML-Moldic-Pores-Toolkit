@@ -46,6 +46,26 @@
 - `user_params_porosity` measures porosity from user parameters.
 - Run each subproject from its own PDM environment and directory.
 
+## Testing
+
+### General
+
+- Run focused tests while iterating; run the full suite before merging.
+- Keep tests deterministic, isolated, and independent of execution order.
+- Use temporary directories; never alter real uploads or results.
+
+### Workflows
+
+- Test persisted workflows across queued, failed, and restart states.
+- Add regression tests for concurrent queues and workflow state changes.
+- Coordinate concurrency tests with events or barriers, not timing sleeps.
+
+### Portable Scripts
+
+- Run ShellCheck, shfmt, Bash, and Dash after shell changes.
+- Run mocked flows in Git Bash, WSL, and macOS CI.
+- Smoke-test real Docker flows when the local platform permits it.
+
 ## Scripts
 
 - Prefer POSIX shell and `#!/bin/sh`; document required Bash features.
@@ -56,9 +76,6 @@
 - Support both `docker compose` and `docker-compose`.
 - Keep Windows launcher behavior aligned with POSIX launchers.
 - Remove Docker resources only when both project labels match.
-- Run ShellCheck, shfmt, Bash, and Dash after shell changes.
-- Run mocked flows in Git Bash, WSL, and macOS CI.
-- Smoke-test real Docker flows when the local platform permits it.
 
 ## Paths and Commands
 
@@ -71,8 +88,6 @@
 ## Workflows
 
 - A tool flow may include human steps and automated jobs.
-- Add regression tests for concurrent queues and workflow state changes.
-- Coordinate concurrency tests with events or barriers, not timing sleeps.
 - Human input must not hold an automated processing slot.
 - Show automated progress as part of its parent tool flow.
 - Serialize jobs that compete for the same processing resource.
