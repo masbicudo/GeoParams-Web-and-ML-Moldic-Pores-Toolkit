@@ -18,18 +18,55 @@ jobs:
 
       - name: Lint and check formatting
         run: |
-          shellcheck run.sh remove-docker-app.sh geo_params_web/run.sh \
+          shellcheck -x GeoParams.sh GeoParams.command scripts/*.sh \
+            scripts/lib/*.sh geo_params_web/run.sh \
             tests/shell/test-launchers.sh
-          shfmt -d -i 4 -ci run.sh remove-docker-app.sh \
-            geo_params_web/run.sh tests/shell/test-launchers.sh
+          shfmt -d -i 4 -ci GeoParams.sh GeoParams.command scripts/*.sh \
+            scripts/lib/*.sh geo_params_web/run.sh \
+            tests/shell/test-launchers.sh
 
       - name: Test with Bash and Dash
         run: |
-          bash -n run.sh remove-docker-app.sh geo_params_web/run.sh
-          dash -n run.sh remove-docker-app.sh geo_params_web/run.sh
+          bash -n GeoParams.sh GeoParams.command scripts/*.sh \
+            scripts/lib/*.sh geo_params_web/run.sh
+          dash -n GeoParams.sh GeoParams.command scripts/*.sh \
+            scripts/lib/*.sh geo_params_web/run.sh
           bash tests/shell/test-launchers.sh bash
           dash tests/shell/test-launchers.sh dash
           bats tests/shell/launchers.bats
+
+      - name: Test dataset verification logic
+        run: python3 -m unittest tests.test_dataset_manager -v
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check PowerShell syntax
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem scripts -Recurse -Filter *.ps1
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $file.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              exit 1
+            }
+          }
+
+      - name: Open and leave the Windows manager
+        shell: cmd
+        run: (echo q)|GeoParams.bat
+
+      - name: Test dataset verification logic
+        run: python -m unittest tests.test_dataset_manager -v
 
   macos:
     runs-on: macos-latest
@@ -45,9 +82,12 @@ jobs:
 
       - name: Test portable launchers
         run: |
-          chmod +x run.sh remove-docker-app.sh geo_params_web/run.sh
+          chmod +x GeoParams.sh GeoParams.command scripts/*.sh
+          chmod +x scripts/lib/*.sh geo_params_web/run.sh
           chmod +x tests/shell/test-launchers.sh
-          sh -n run.sh remove-docker-app.sh geo_params_web/run.sh
-          bash -n run.sh remove-docker-app.sh geo_params_web/run.sh
+          sh -n GeoParams.sh GeoParams.command scripts/*.sh \
+            scripts/lib/*.sh geo_params_web/run.sh
+          bash -n GeoParams.sh GeoParams.command scripts/*.sh \
+            scripts/lib/*.sh geo_params_web/run.sh
           sh tests/shell/test-launchers.sh sh
           bash tests/shell/test-launchers.sh bash
