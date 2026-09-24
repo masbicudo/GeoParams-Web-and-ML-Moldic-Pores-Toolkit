@@ -72,10 +72,12 @@ try {
         "3" {
             Remove-ProjectContainers
             Remove-ProjectNetworks
-            $ImageIds = @(& docker image ls `
-                --filter "label=$ProjectLabel" `
-                --filter "label=$ManagerLabel" `
-                --format "{{.ID}}") | Sort-Object -Unique
+            $ImageIds = @(
+                @(& docker image ls `
+                    --filter "label=$ProjectLabel" `
+                    --filter "label=$ManagerLabel" `
+                    --format "{{.ID}}") | Sort-Object -Unique
+            )
             if ($ImageIds.Count -eq 0) {
                 Write-Host "No project-labeled images were found."
             } else {
