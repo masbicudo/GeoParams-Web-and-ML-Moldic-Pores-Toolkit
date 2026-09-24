@@ -16,13 +16,40 @@ This project analyzes how geologists parameterize and interpret petrographic thi
 > changes. It documents the branch, privacy, data, script, and testing rules
 > followed by human developers and coding agents.
 
+## Start here: guided repository manager
+
+The repository includes one guided menu for starting the application,
+downloading and verifying public datasets, checking requirements, running safe
+tests, and removing only the Docker resources owned by this project.
+
+- **Windows:** double-click `GeoParams.bat`.
+- **macOS:** double-click `GeoParams.command`.
+- **Linux or Git Bash:** run `./GeoParams.sh` from the repository root.
+
+The manager explains missing requirements and lets you check them again after
+following the displayed instructions. It does not install host software or
+change system settings. Automated work happens inside project-labeled Docker
+containers, and persistent datasets, uploads, and results remain in ignored
+folders on the host.
+
+Docker is required to run the web application and to use the automatic,
+hash-verified dataset downloader. It is not required if you download the
+public datasets manually with a browser.
+
 ## Requirements
 
-- PDM (Python package manager)
-- Python 3.12
-- NVIDIA CUDA driver ≥ 13.0 (required for GPU acceleration only in the
-  `ml_moldic_pores` project folder; not needed for `geo_params_web`)
-- Visual Studio Code (for running Jupyter notebooks; optional but recommended)
+| Requirement        | Run web app | Develop web app | Run models | Develop models |
+|--------------------|-------------|-----------------|------------|----------------|
+| Docker + Compose   | Required    | Recommended     | Data only¹ | Data only¹     |
+| Python 3.12        | No          | Required        | Required   | Required       |
+| PDM                | No          | Required        | Required   | Required       |
+| Relevant datasets  | Required    | Required        | Required   | Required       |
+| NVIDIA CUDA driver | No          | No              | Optional²  | Optional²      |
+| VS Code + Jupyter  | No          | Optional        | Notebooks³ | Recommended    |
+
+¹ Docker is used by the guided downloader, not by a manual browser download.<br>
+² CUDA ≥ 13.0 is only for GPU acceleration in `ml_moldic_pores`.<br>
+³ Notebook workflows need Jupyter; direct Python entry points do not.
 
 The repository can be partially explored (quick test and data collection
 application) without GPU support.
@@ -33,8 +60,14 @@ Due to GitHub’s file size limits (100 MB per file), the high-resolution
 petrographic thin-section images used in this study cannot be hosted
 directly in this repository.
 
-Download the public dataset from Google Drive and place the dataset folders in
-the repository root as `datasets/`:
+Use **Dataset management** in the guided repository manager to download either
+the smaller application set or every research dataset. The downloader resumes
+partial transfers and checks every file against the versioned SHA-256 manifest
+before accepting it.
+
+Alternatively, download the public dataset in a browser and place its folders
+in the repository root as `datasets/`:
+
 - [https://drive.google.com/drive/folders/1s-NAWbgukQG-1Q3M5MpO808XRqA1QVw4?usp=sharing](https://drive.google.com/drive/folders/1s-NAWbgukQG-1Q3M5MpO808XRqA1QVw4?usp=sharing)
 
 Expected local layout:
@@ -48,8 +81,9 @@ datasets/
 
 The reduced images required for running the data collection app are generated locally from these files.
 
-The repository contains all code required to process the images once
-they are downloaded.
+The hash manifest is an implementation detail under `scripts/`; users only
+need the root manager. Invalid existing files are reported and preserved under
+a timestamped name before replacement is explicitly requested.
 
 ### Running notebooks
 
@@ -140,25 +174,18 @@ The data collection application is located in the `geo_params_web` project folde
 
 ### Docker (recommended)
 
-The guided launcher checks Docker and the public image dataset before starting.
-It explains how to satisfy a missing prerequisite, then lets you check again.
-It never installs software or changes system settings.
-
-On Linux or macOS, run from the repository root:
+Open the guided repository manager described at the top of this README and
+choose **Run or install the web application with Docker**. From Linux or Git
+Bash, for example:
 
 ```bash
-./run.sh
+./GeoParams.sh
 ```
 
-The same `run.sh` also supports Git Bash on Windows. It works with current
-`docker compose` installations and the older standalone `docker-compose`
-command. The scripts use POSIX `sh` syntax for compatibility with Bash, Dash,
-Git Bash, and the system shell included with macOS.
-
-On Windows, double-click `run.bat`, or run it from a terminal:
+On Windows, double-click the manager or run:
 
 ```bat
-run.bat
+GeoParams.bat
 ```
 
 The launcher builds the tagged application image, prepares the local image
@@ -172,10 +199,10 @@ At the end, choose whether to leave the application running in the background
 or stop it. Detailed diagnostics are written to
 `geo_params_web/log/docker-run.log` without flooding the terminal.
 
-Use `remove-docker-app.sh` on Linux or macOS, or
-`remove-docker-app.bat` on Windows, to stop the app, remove its containers, or
-remove only images carrying this project's ownership labels. These scripts do
-not delete uploads, results, unrelated images, or the shared Nginx image.
+Use the manager's **Stop or uninstall** option to stop the app, remove its
+containers, or remove only images carrying both project ownership labels. It
+does not delete datasets, uploads, results, unrelated images, or the shared
+Nginx image.
 
 Set `GEO_PARAMS_PORT` before running the command to use a different host port.
 For non-local deployments, also set a strong `FLASK_SECRET_KEY`.
@@ -216,9 +243,9 @@ directory. Earlier completed output records are also presented as read-only
 collection summaries. Completed and discarded collections cannot be reopened
 for editing.
 
-Collection lists and summaries intentionally omit participant names, contact
-details, dataset names, and image filenames. They use opaque collection IDs,
-timestamps, workflow state, and technical parameter summaries instead.
+Collection lists and summaries intentionally omit participant names and
+contact details. Dataset names and image filenames are not personal data by
+default and may be displayed when they help distinguish a workflow.
 
 ### Porosity calculator
 
