@@ -3,6 +3,18 @@ x-project-labels: &project-labels
   io.geoparams.managed-by: geo-params-launcher
 
 services:
+  dataset-manager:
+    image: ${GEO_PARAMS_DATASET_IMAGE:-geo-params-datasets:app-v2}
+    build:
+      context: ..
+      dockerfile: scripts/Dockerfile.datasets
+    environment:
+      HOME: /tmp
+    labels: *project-labels
+    user: "${GEO_PARAMS_UID:-0}:${GEO_PARAMS_GID:-0}"
+    volumes:
+      - ../datasets:/datasets
+
   prepare:
     image: ${GEO_PARAMS_IMAGE:-geo-params-web-app:app-v2}
     command: ["pdm", "run", "python", "prepare_web_images.py"]
