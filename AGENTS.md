@@ -48,19 +48,19 @@
 
 ## Testing
 
-### General
+### General Tests
 
 - Run focused tests while iterating; run the full suite before merging.
 - Keep tests deterministic, isolated, and independent of execution order.
 - Use temporary directories; never alter real uploads or results.
 
-### Workflows
+### Workflow Tests
 
 - Test persisted workflows across queued, failed, and restart states.
 - Add regression tests for concurrent queues and workflow state changes.
 - Coordinate concurrency tests with events or barriers, not timing sleeps.
 
-### Portable Scripts
+### Portable Script Tests
 
 - Run ShellCheck, shfmt, Bash, and Dash after shell changes.
 - Run mocked flows in Git Bash, WSL, and macOS CI.
