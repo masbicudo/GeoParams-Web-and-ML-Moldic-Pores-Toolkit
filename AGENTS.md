@@ -71,6 +71,8 @@
 ## Workflows
 
 - A tool flow may include human steps and automated jobs.
+- Add regression tests for concurrent queues and workflow state changes.
+- Coordinate concurrency tests with events or barriers, not timing sleeps.
 - Human input must not hold an automated processing slot.
 - Show automated progress as part of its parent tool flow.
 - Serialize jobs that compete for the same processing resource.

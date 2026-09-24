@@ -126,32 +126,92 @@ class ParameterCollectionRouteTests(unittest.TestCase):
         self.assertEqual(payload["progress"], 100)
         self.assertIn("/params_select", payload["continue_url"])
 
-    def test_task_executor_reserves_launch_before_thread_starts(self) -> None:
+    def test_concurrent_status_requests_launch_only_one_worker(self) -> None:
         collection, session_id = self._start_collection()
+        session = get_session(session_id)
+        session["tasks"] = {
+            "initial_image_setup": {
+                "arguments": [480],
+                "cache": {},
+                "alive_tag": None,
+                "state": "Requested",
+                "timeout": None,
+                "progress": None,
+                "result": None,
+                "error": None,
+            }
+        }
+        update_parameter_collection(
+            collection["id"],
+            session=session,
+            status="running",
+            stage="image_processing",
+            progress=0,
+            message="Preparing parameter space",
+        )
         started = threading.Event()
         release = threading.Event()
         finished = threading.Event()
+        callers = 8
+        barrier = threading.Barrier(callers)
         calls = []
+        responses = []
+        failures = []
+        result_lock = threading.Lock()
 
         def delayed_task(_session_id, _count_timeouts, _launch_token):
-            calls.append(_session_id)
+            with result_lock:
+                calls.append(_session_id)
             started.set()
-            release.wait(timeout=2)
+            release.wait(timeout=5)
             finished.set()
 
-        with patch.object(web_app, "initial_image_setup", delayed_task):
-            web_app.task_executor(
-                session_id,
-                "initial_image_setup",
-                arguments=[480],
-            )
-            self.assertTrue(started.wait(timeout=2))
-            web_app.task_executor(session_id, "initial_image_setup")
+        def request_status() -> None:
+            try:
+                barrier.wait(timeout=5)
+                with web_app.app.test_client() as client:
+                    response = client.get(
+                        f"/parameter-collections/{collection['id']}/status"
+                    )
+                with result_lock:
+                    responses.append(response.status_code)
+            except Exception as exc:
+                with result_lock:
+                    failures.append(exc)
+
+        threads = [threading.Thread(target=request_status) for _ in range(callers)]
+        try:
+            with patch.object(web_app, "initial_image_setup", delayed_task):
+                for thread in threads:
+                    thread.start()
+                for thread in threads:
+                    thread.join(timeout=5)
+                self.assertTrue(started.wait(timeout=2))
+        finally:
             release.set()
             self.assertTrue(finished.wait(timeout=2))
 
+        self.assertFalse(failures)
+        self.assertTrue(all(not thread.is_alive() for thread in threads))
+        self.assertEqual(responses, [200] * callers)
         self.assertEqual(calls, [session_id])
-        self.assertIsNotNone(collection)
+
+    def test_obsolete_worker_cannot_overwrite_current_task(self) -> None:
+        _collection, session_id = self._start_collection()
+        session = get_session(session_id)
+        stale_token = web_app.ProcessToken("Queued")
+        current_token = web_app.ProcessToken("Queued")
+        session["tasks"] = {
+            "initial_image_setup": {
+                "state": "Requested",
+                "alive_tag": current_token,
+            }
+        }
+
+        with patch.object(web_app, "_sync_collection") as sync_collection:
+            web_app.initial_image_setup(session_id, 0, stale_token)
+
+        sync_collection.assert_not_called()
 
 
 if __name__ == "__main__":
