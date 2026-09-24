@@ -1,0 +1,53 @@
+name: Test portable shell launchers
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint-and-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install shell test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck shfmt dash bats
+
+      - name: Lint and check formatting
+        run: |
+          shellcheck run.sh remove-docker-app.sh geo_params_web/run.sh \
+            tests/shell/test-launchers.sh
+          shfmt -d -i 4 -ci run.sh remove-docker-app.sh \
+            geo_params_web/run.sh tests/shell/test-launchers.sh
+
+      - name: Test with Bash and Dash
+        run: |
+          bash -n run.sh remove-docker-app.sh geo_params_web/run.sh
+          dash -n run.sh remove-docker-app.sh geo_params_web/run.sh
+          bash tests/shell/test-launchers.sh bash
+          dash tests/shell/test-launchers.sh dash
+          bats tests/shell/launchers.bats
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show environment
+        run: |
+          sw_vers
+          uname -a
+          bash --version
+          zsh --version
+
+      - name: Test portable launchers
+        run: |
+          chmod +x run.sh remove-docker-app.sh geo_params_web/run.sh
+          chmod +x tests/shell/test-launchers.sh
+          sh -n run.sh remove-docker-app.sh geo_params_web/run.sh
+          bash -n run.sh remove-docker-app.sh geo_params_web/run.sh
+          sh tests/shell/test-launchers.sh sh
+          bash tests/shell/test-launchers.sh bash
