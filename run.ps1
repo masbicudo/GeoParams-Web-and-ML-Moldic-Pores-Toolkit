@@ -26,8 +26,28 @@ function Request-Retry {
 
 function Test-DockerCommand {
     param([string[]]$Arguments)
-    & docker @Arguments *> $null
-    return $LASTEXITCODE -eq 0
+    $PreviousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & docker @Arguments *> $null
+        $ExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $PreviousPreference
+    }
+    return $ExitCode -eq 0
+}
+
+function Invoke-DockerLogged {
+    param([string[]]$Arguments)
+    $PreviousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & docker @Arguments *>> $LogFile
+        $ExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $PreviousPreference
+    }
+    return $ExitCode
 }
 
 function Invoke-DockerStep {
@@ -36,8 +56,8 @@ function Invoke-DockerStep {
         [string[]]$Arguments
     )
     Write-Host -NoNewline "$Label... "
-    & docker @Arguments *>> $LogFile
-    if ($LASTEXITCODE -ne 0) {
+    $ExitCode = Invoke-DockerLogged -Arguments $Arguments
+    if ($ExitCode -ne 0) {
         Write-Host "failed"
         Write-Host "See geo_params_web/log/docker-run.log for details."
         exit 1
@@ -120,12 +140,15 @@ try {
     Write-Host -NoNewline "[4/4] Waiting for the web interface... "
     $Ready = $false
     for ($Attempt = 0; $Attempt -lt 60; $Attempt++) {
-        & docker compose exec -T nginx wget -qO- `
-            http://127.0.0.1/health *> $null
-        $HealthReady = $LASTEXITCODE -eq 0
-        & docker compose exec -T nginx wget -qO- `
-            http://127.0.0.1/geo-server/ *> $null
-        if ($HealthReady -and $LASTEXITCODE -eq 0) {
+        $HealthReady = Test-DockerCommand @(
+            "compose", "exec", "-T", "nginx", "wget", "-qO-",
+            "http://127.0.0.1/health"
+        )
+        $AppReady = Test-DockerCommand @(
+            "compose", "exec", "-T", "nginx", "wget", "-qO-",
+            "http://127.0.0.1/geo-server/"
+        )
+        if ($HealthReady -and $AppReady) {
             $Ready = $true
             break
         }
@@ -134,8 +157,10 @@ try {
 
     if (-not $Ready) {
         Write-Host "failed"
-        & docker compose ps *>> $LogFile
-        & docker compose logs --no-color --tail=200 *>> $LogFile
+        [void](Invoke-DockerLogged @("compose", "ps"))
+        [void](Invoke-DockerLogged @(
+            "compose", "logs", "--no-color", "--tail=200"
+        ))
         Write-Host "The application did not become ready."
         Write-Host "See geo_params_web/log/docker-run.log for details."
         exit 1
