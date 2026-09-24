@@ -1,5 +1,5 @@
-#!/usr/bin/env sh
+#!/bin/sh
 set -eu
 
-repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo_dir=$(CDPATH='' cd -P "$(dirname "$0")/.." && pwd)
 exec "$repo_dir/run.sh" "$@"

@@ -1,5 +1,3 @@
-name: geo-params-web
-
 x-project-labels: &project-labels
   io.geoparams.project: geo-params-web
   io.geoparams.managed-by: geo-params-launcher

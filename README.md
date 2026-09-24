@@ -146,6 +146,11 @@ On Linux or macOS, run from the repository root:
 ./run.sh
 ```
 
+The same `run.sh` also supports Git Bash on Windows. It works with current
+`docker compose` installations and the older standalone `docker-compose`
+command. The scripts use POSIX `sh` syntax for compatibility with Bash, Dash,
+Git Bash, and the system shell included with macOS.
+
 On Windows, double-click `run.bat`, or run it from a terminal:
 
 ```bat

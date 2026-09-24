@@ -16,6 +16,9 @@ $LogFile = Join-Path $LogDir "docker-run.log"
 
 $env:GEO_PARAMS_PORT = $Port
 $env:GEO_PARAMS_IMAGE = $Image
+if (-not $env:COMPOSE_PROJECT_NAME) {
+    $env:COMPOSE_PROJECT_NAME = "geo-params-web"
+}
 
 function Request-Retry {
     $Answer = Read-Host "Press Enter to check again, or type q to exit"

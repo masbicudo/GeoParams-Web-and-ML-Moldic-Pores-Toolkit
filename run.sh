@@ -1,7 +1,7 @@
-#!/usr/bin/env sh
+#!/bin/sh
 set -eu
 
-repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_dir=$(CDPATH='' cd -P "$(dirname "$0")" && pwd)
 app_dir="$repo_dir/geo_params_web"
 install_url="https://docs.docker.com/get-started/get-docker/"
 dataset_url="https://drive.google.com/drive/folders/1s-NAWbgukQG-1Q3M5MpO808XRqA1QVw4?usp=sharing"
@@ -11,12 +11,36 @@ log_file="$app_dir/log/docker-run.log"
 
 export GEO_PARAMS_PORT="$port"
 export GEO_PARAMS_IMAGE="$image"
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-geo-params-web}"
+
+compose_style=
+
+detect_compose() {
+    if docker compose version >/dev/null 2>&1; then
+        compose_style=plugin
+        return 0
+    fi
+    if command -v docker-compose >/dev/null 2>&1 &&
+        docker-compose version >/dev/null 2>&1; then
+        compose_style=standalone
+        return 0
+    fi
+    return 1
+}
+
+compose() {
+    if [ "$compose_style" = plugin ]; then
+        docker compose "$@"
+    else
+        docker-compose "$@"
+    fi
+}
 
 retry_or_exit() {
     printf "Press Enter to check again, or type q to exit: "
     read -r answer || answer=q
     case "$answer" in
-        q|Q) exit 1 ;;
+        q | Q) exit 1 ;;
     esac
 }
 
@@ -43,7 +67,7 @@ while ! command -v docker >/dev/null 2>&1; do
     retry_or_exit
 done
 
-while ! docker compose version >/dev/null 2>&1; do
+while ! detect_compose; do
     echo "Docker Compose is not available."
     echo "Install the current Docker package from: $install_url"
     retry_or_exit
@@ -76,7 +100,7 @@ while [ ! -d "$source_images" ] && [ "$cache_ready" = false ]; do
 done
 
 case "$port" in
-    ''|*[!0-9]*)
+    '' | *[!0-9]*)
         echo "GEO_PARAMS_PORT must be a number between 1 and 65535."
         exit 1
         ;;
@@ -91,26 +115,26 @@ mkdir -p "$app_dir/data/uploads" "$app_dir/log"
 : >"$log_file"
 
 cd "$app_dir"
-run_step "[1/4] Building the application" docker compose build
+run_step "[1/4] Building the application" compose build
 if [ -d "$source_images" ]; then
     run_step "[2/4] Preparing petrographic images" \
-        docker compose run --rm prepare
+        compose run --rm prepare
 else
     echo "[2/4] Using the existing petrographic image cache... done"
 fi
-run_step "[3/4] Starting the web application" docker compose up -d app nginx
+run_step "[3/4] Starting the web application" compose up -d app nginx
 
 printf "[4/4] Waiting for the web interface... "
 attempt=0
-until docker compose exec -T nginx \
-    wget -qO- http://127.0.0.1/health >/dev/null 2>&1 \
-    && docker compose exec -T nginx \
-    wget -qO- http://127.0.0.1/geo-server/ >/dev/null 2>&1; do
+until compose exec -T nginx \
+    wget -qO- http://127.0.0.1/health >/dev/null 2>&1 &&
+    compose exec -T nginx \
+        wget -qO- http://127.0.0.1/geo-server/ >/dev/null 2>&1; do
     attempt=$((attempt + 1))
     if [ "$attempt" -ge 60 ]; then
         echo "failed"
-        docker compose ps >>"$log_file" 2>&1 || true
-        docker compose logs --no-color --tail=200 >>"$log_file" 2>&1 || true
+        compose ps >>"$log_file" 2>&1 || true
+        compose logs --no-color --tail=200 >>"$log_file" 2>&1 || true
         echo "The application did not become ready."
         echo "See geo_params_web/log/docker-run.log for details."
         exit 1
@@ -132,7 +156,7 @@ read -r choice || choice=1
 
 case "$choice" in
     2)
-        run_step "Stopping the application" docker compose stop
+        run_step "Stopping the application" compose stop
         echo "The application is stopped. Its saved data was preserved."
         ;;
     *)
