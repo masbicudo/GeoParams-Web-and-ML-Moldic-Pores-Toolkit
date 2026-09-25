@@ -13,8 +13,10 @@ This project analyzes how geologists parameterize and interpret petrographic thi
 > tag.
 
 > **Developing this project?** Read [`AGENTS.md`](AGENTS.md) before making
-> changes. It documents the branch, privacy, data, script, and testing rules
-> followed by human developers and coding agents.
+> changes, then follow nested instructions for the subproject you edit.
+> It defines shared rules and points to
+> [development checks](docs/development-checks.md),
+> [script policies](docs/scripts.md), and [TODO conventions](docs/about-todos.md).
 
 ## Start here: guided repository manager
 

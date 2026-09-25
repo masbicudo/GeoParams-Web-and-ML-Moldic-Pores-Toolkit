@@ -110,7 +110,7 @@ def get_images(base_image, step=4, thresh=480,
             #map_img[c//step, y//step] = np.array([c, y, 0])
             map_img[c//step, k//step] = colors[int(rmm(count_regions, 0, len(colors)-1))]
 
-            # `do_step` is a cancelation mechanism. It indicates whether to
+            # `do_step` is a cancellation mechanism. It indicates whether to
             # continue processing or not. If the user cancels the operation,
             # for example by starting a new processing operation,
             # then it should return False for the previous call of get_images

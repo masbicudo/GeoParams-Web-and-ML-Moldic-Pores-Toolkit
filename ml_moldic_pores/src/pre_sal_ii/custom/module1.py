@@ -68,7 +68,7 @@ def get_input_image():
 
 def get_probability_maps_simple(inputImage):
 
-    # BGR to CMKY:
+    # BGR to CMYK:
     inputImageCMYK = colorspace.bgr2cmyk(inputImage)
 
     binaryImage = cv2.inRange(

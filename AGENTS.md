@@ -8,6 +8,8 @@
 - Rules SHOULD fit within 80 characters; rare exceptions MUST aid clarity.
 - Rules SHOULD remain concise, specific, and nonredundant.
 - Order sections and their rules by relevance to human developers.
+- Read nested AGENTS.md files before working in their scope.
+- Nested rules inherit this contract; do not repeat inherited rules.
 
 ## Branches
 
@@ -34,7 +36,6 @@
 - Keep large datasets in the ignored repository-level `datasets/`.
 - Version small metadata when it defines a reproducible method.
 - Keep uploads, caches, generated results, and credentials out of Git.
-- Store persistent app data in a bind-mounted, ignored host directory.
 - Never rely on a Docker container layer for persistent user data.
 - Treat generated outputs as caches, not as source datasets.
 
@@ -46,36 +47,20 @@
 - `user_params_porosity` measures porosity from user parameters.
 - Run each subproject from its own PDM environment and directory.
 
-## Testing
+## Development Workflow
+
+- Inspect relevant code and configuration before editing.
+- Use existing repository scripts and tools; derive commands from files.
+- Fix regressions introduced by your changes.
 
 ### General Tests
 
-- Run focused tests while iterating; run the full suite before merging.
+- Run narrow automated checks while iterating; broaden them with change scope.
+- Run the full suite before merging.
 - Keep tests deterministic, isolated, and independent of execution order.
 - Use temporary directories; never alter real uploads or results.
-
-### Workflow Tests
-
-- Test persisted workflows across queued, failed, and restart states.
-- Add regression tests for concurrent queues and workflow state changes.
-- Coordinate concurrency tests with events or barriers, not timing sleeps.
-
-### Portable Script Tests
-
-- Run ShellCheck, shfmt, Bash, and Dash after shell changes.
-- Run mocked flows in Git Bash, WSL, and macOS CI.
-- Smoke-test real Docker flows when the local platform permits it.
-
-## Scripts
-
-- Prefer POSIX shell and `#!/bin/sh`; document required Bash features.
-- Keep `.sh` files LF-terminated and executable.
-- Support Git Bash, Linux, and macOS; avoid platform-only flags.
-- Check dependencies with `command -v`; never scan whole disks.
-- Never install host tools; explain missing tools and allow a retry.
-- Support both `docker compose` and `docker-compose`.
-- Keep Windows launcher behavior aligned with POSIX launchers.
-- Remove Docker resources only when both project labels match.
+- Report executed checks, results, and unavailable checks explicitly.
+- Do not substitute mental inference for available automated verification.
 
 ## Paths and Commands
 
@@ -85,15 +70,10 @@
 - Put long configurable commands in an advanced section.
 - Report missing paths and expected layouts without noisy tracebacks.
 
-## Workflows
+## Task Routing
 
-- A tool flow may include human steps and automated jobs.
-- Human input must not hold an automated processing slot.
-- Show automated progress as part of its parent tool flow.
-- Serialize jobs that compete for the same processing resource.
-- Mark flows waiting for user input without blocking queued jobs.
-- Make completed parameter collections read-only.
-- Open completed collections on a summary page.
-- Put flow lists on tool landing pages, not on result pages.
-- Show active flows from all tools in the global helper.
-- Persist job state and results in the mounted data directory.
+- For app work, read [app rules](geo_params_web/AGENTS.md).
+- For scientific method work, read [method docs](user_params_porosity/README.md).
+- For scripts or Docker cleanup, read [script policies](docs/scripts.md).
+- For verification, read [development checks](docs/development-checks.md).
+- For TODO changes, follow [the convention](docs/about-todos.md).

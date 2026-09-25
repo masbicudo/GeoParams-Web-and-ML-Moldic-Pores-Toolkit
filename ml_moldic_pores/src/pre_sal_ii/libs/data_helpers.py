@@ -21,8 +21,8 @@ def pir_alt1(df, column, prefix=None, prefix_sep="_", drop=False, join=False):
         return df
         
     dropper = lambda df: df.drop(column, axis=1) if drop else df[column]
-    joinner = lambda df: zero_cols(df.join(dummies), dummies.columns) if join else dummies
-    return joinner(dropper(df))
+    joiner = lambda df: zero_cols(df.join(dummies), dummies.columns) if join else dummies
+    return joiner(dropper(df))
 
 def pir_fast(df, column, prefix=None, prefix_sep="_", drop=False, join=False):
     # ref.: https://stackoverflow.com/a/45313942/195417
@@ -40,8 +40,8 @@ def pir_fast(df, column, prefix=None, prefix_sep="_", drop=False, join=False):
     )
 
     dropper = lambda df: df.drop(column, axis=1) if drop else df[column]
-    joinner = lambda df: df.join(dummies) if join else dummies
-    return joinner(dropper(df))
+    joiner = lambda df: df.join(dummies) if join else dummies
+    return joiner(dropper(df))
 
 def get_many_dummies(df, column, prefix=None, prefix_sep="_", replace=False, perf_split=500):
     exec = pir_fast if df.shape[0] < perf_split else pir_alt1
@@ -159,7 +159,7 @@ def test_apply_converters():
     import pandas as pd
     import ast
     df = pd.DataFrame([
-        ["2022-12-25", "['marry','christmas']"],
+        ["2022-12-25", "['merry','Christmas']"],
         ["2022-12-31", "['happy','new','year']"],
     ], columns=["event_datetime", "message_array"])
     print("INPUT", df)

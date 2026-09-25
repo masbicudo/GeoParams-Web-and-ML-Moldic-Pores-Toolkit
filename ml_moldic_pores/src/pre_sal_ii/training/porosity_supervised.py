@@ -22,7 +22,7 @@ def train_porosity_supervised(
     if gamma != 1.0:
         inputImage = adjust_gamma(inputImage, gamma)
 
-    # BGR to CMKY:
+    # BGR to CMYK:
     inputImageCMYK = colorspace.bgr2cmyk(inputImage)
 
     binaryImage = cv2.inRange(
@@ -175,7 +175,7 @@ def apply_model(
 
     inputImage = cv2.imread(path)
 
-    # BGR to CMKY:
+    # BGR to CMYK:
     inputImageCMYK = colorspace.bgr2cmyk(inputImage)
 
     binaryImage = cv2.inRange(
