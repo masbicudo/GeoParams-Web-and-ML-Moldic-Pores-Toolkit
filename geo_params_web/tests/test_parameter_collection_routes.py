@@ -95,6 +95,32 @@ class ParameterCollectionRouteTests(unittest.TestCase):
         self.assertIn(b"Input needed", overview.data)
         self.assertNotIn(b"window.setTimeout", overview.data)
 
+    def test_porosity_result_includes_interactive_mask_controls(self) -> None:
+        result = {
+            "id": "a" * 32,
+            "summary": {"porosity_20p": 0.2, "top_decile_normalizer": 127.5},
+            "threshold_results": [
+                {"threshold": 0.2, "key": "porosity_20p", "value": 0.2},
+            ],
+            "bootstrap_requested": False,
+            "original_filename": "sample.png",
+            "dataset_name": "Sample dataset",
+        }
+        with patch("app.load_result", return_value=result), patch(
+            "app.list_porosity_jobs", return_value=[]
+        ):
+            response = self.client.get("/porosity/results/" + result["id"])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"data-porosity-viewer", response.data)
+        self.assertIn(b"Mask range", response.data)
+        self.assertIn(b"Mask mode", response.data)
+        self.assertIn(b"Transparency", response.data)
+        self.assertIn(b"Enable zoom", response.data)
+        self.assertIn(b"click to fix it", response.data)
+        self.assertIn(b"data-porosity-zoom-lens", response.data)
+        self.assertIn(b"porosity_result_viewer.js", response.data)
+
     def test_status_repairs_collection_after_processing_finished(self) -> None:
         collection, session_id = self._start_collection()
         session = get_session(session_id)

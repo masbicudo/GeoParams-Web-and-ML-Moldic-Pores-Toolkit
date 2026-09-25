@@ -126,13 +126,82 @@
   manuscript-compatible porosity estimate.
 </div>
 
-<h3 class="h5">Superposition mean mask</h3>
-<p class="text-muted">
-  Brighter pixels were classified as pores by a larger share of the retained parameter masks.
-</p>
-<img class="img-fluid porosity-mask mb-4"
-     src="{{ url_for('porosity_result_image', run_id=result.id, kind='mask') }}"
-     alt="Mean superposition mask">
+<section class="porosity-viewer mb-4"
+         data-porosity-viewer
+         data-input-url="{{ url_for('porosity_result_image', run_id=result.id, kind='input') }}"
+         data-mask-url="{{ url_for('porosity_result_image', run_id=result.id, kind='mask') }}"
+         data-normalizer="{{ summary.top_decile_normalizer }}">
+  <h3 class="h5">Mask visualization</h3>
+  <p class="text-muted">
+    Explore the saved mean mask without changing the calculated result.
+  </p>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <label class="form-label" for="porosity-mask-range">Mask range</label>
+      <select class="form-select" id="porosity-mask-range" data-porosity-range>
+        <option value="grayscale">Grayscale</option>
+        <option value="binary">Binary</option>
+      </select>
+    </div>
+    <div class="col-md-6 d-none" data-porosity-threshold-group>
+      <label class="form-label" for="porosity-threshold">Threshold</label>
+      <select class="form-select" id="porosity-threshold" data-porosity-threshold>
+        {% for item in result.threshold_results %}
+        <option value="{{ item.threshold }}" data-porosity="{{ item.value }}"
+                {% if item.key == 'porosity_20p' %}selected{% endif %}>
+          {{ '%.1f' | format(100 * item.threshold) }}% — {{ '%.2f' | format(100 * item.value) }}% porosity
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <label class="form-label" for="porosity-mask-mode">Mask mode</label>
+      <select class="form-select" id="porosity-mask-mode" data-porosity-mode>
+        <option value="normal">Normal</option>
+        <option value="transparent">Transparency</option>
+      </select>
+    </div>
+    <div class="col-md-6 d-none" data-porosity-color-group>
+      <label class="form-label" for="porosity-mask-color">Color</label>
+      <select class="form-select" id="porosity-mask-color" data-porosity-color>
+        <option value="red">Red</option>
+        <option value="black">Black</option>
+        <option value="white">White</option>
+      </select>
+    </div>
+    <div class="col-12">
+      <label class="form-label d-flex justify-content-between" for="porosity-mask-opacity">
+        <span>Mask opacity over original image</span>
+        <output data-porosity-opacity-output>70%</output>
+      </label>
+      <input class="form-range" id="porosity-mask-opacity" type="range"
+             min="0" max="100" value="70" data-porosity-opacity>
+      <div class="form-text">0% shows the original image; 100% shows the selected mask.</div>
+    </div>
+  </div>
+
+  <p class="small text-muted" data-porosity-selection aria-live="polite"></p>
+  <div class="form-check mb-3">
+    <input class="form-check-input" id="porosity-zoom" type="checkbox"
+           data-porosity-zoom>
+    <label class="form-check-label" for="porosity-zoom">Enable zoom</label>
+    <div class="form-text">
+      Move the pointer for 5× zoom; click to fix it, and click again or disable zoom to clear it.
+    </div>
+  </div>
+  <div class="porosity-canvas-wrap">
+    <canvas class="porosity-mask" data-porosity-canvas
+            aria-label="Interactive porosity mask visualization"></canvas>
+    <div class="porosity-zoom-lens d-none" data-porosity-zoom-lens aria-hidden="true">
+      <canvas width="220" height="220" data-porosity-zoom-canvas></canvas>
+    </div>
+  </div>
+  <p class="small text-danger mt-2 d-none" data-porosity-viewer-error></p>
+</section>
+<script src="{{ url_for('static', filename='porosity_result_viewer.js') }}"></script>
 
 <div>
   <a class="btn btn-primary"

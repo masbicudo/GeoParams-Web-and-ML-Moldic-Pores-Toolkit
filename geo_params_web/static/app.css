@@ -110,6 +110,37 @@ body {
     border: 1px solid #ced4da;
     background: #111;
 }
+.porosity-canvas-wrap {
+    overflow: hidden;
+    border: 1px solid #ced4da;
+    background: #111;
+    position: relative;
+}
+.porosity-canvas-wrap .porosity-mask {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 0;
+}
+.porosity-zoom-lens {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+    border: 2px solid var(--bs-primary);
+    border-radius: 0.375rem;
+    background: #fff;
+    box-shadow: 0 0.25rem 0.75rem rgb(0 0 0 / 25%);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+}
+.porosity-zoom-lens canvas {
+    display: block;
+    width: 220px;
+    height: 220px;
+    max-width: none;
+    image-rendering: pixelated;
+}
 .porosity-progress {
     height: 2rem;
     font-size: 1rem;
